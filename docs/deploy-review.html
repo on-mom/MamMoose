@@ -114,7 +114,8 @@
     <div class="score warn"><b>3건</b><span>개선 여지 / 부분 구현</span></div>
     <div class="score miss"><b>2건</b><span>미구현 (지역 가이드·일부 터치포인트)</span></div>
   </div>
-  <div class="callout"><b>2026-09-03 3차 업데이트</b> — 항공권 정보 구조화(날짜·편명·공항·시각) · 구글 지도 API 연동(동선 탭 실제 지도) · 타임라인 항목 장소명 자동 지오코딩 완료. 아래 "구글 지도 세팅" 참고.</div>
+  <div class="callout did" style="background:color-mix(in srgb,var(--ok) 14%,var(--surface));border:1px solid color-mix(in srgb,var(--ok) 32%,var(--border))"><b>🚀 배포됨</b> — <a href="https://mammoose-web-production.up.railway.app" target="_blank" rel="noreferrer">mammoose-web-production.up.railway.app</a> · GitHub 자동 배포 연결됨. <b>내일 아침 할 일</b>은 맨 아래 섹션 참고.</div>
+  <div class="callout"><b>2026-09-03 업데이트</b> — 항공권 구조화 · 구글 지도 연동 · 자동 지오코딩 · 동선 지도↔목록 연동 · 재사용 표 · 숙소 화면 · 타임라인 드래그 버그 수정.</div>
 
   <h2>1 · 05_참고_기획서_원본.txt <span style="font-weight:400; font-size:13px; color:var(--ink-faint)">— 가장 기본</span></h2>
   <p class="h2sub">앱의 뼈대. 5개 탭 + 서브메뉴 구조.</p>
@@ -253,14 +254,42 @@
   </ol>
   <div class="callout warn">⚠️ 키가 이 문서와 채팅에 노출됐으니, 위 <b>웹사이트 제한</b>을 꼭 걸어주세요. 그러면 다른 사이트에서 이 키로 요청해도 거부됩니다. (Maps JS 키는 원래 브라우저에 노출되는 게 정상이라 제한만 걸면 안전)</div>
 
-  <h2>배포 체크리스트</h2>
+  <h2>🚀 배포 완료 — 앱이 인터넷에 올라갔습니다</h2>
+  <div class="band did">
+    <b>✓ 끝난 것 (2026-09-03)</b>
+    <ul>
+      <li>코드 → <a href="https://github.com/on-mom/MamMoose" target="_blank" rel="noreferrer">github.com/on-mom/MamMoose</a> (main)</li>
+      <li>Railway 서비스 <span class="path">mammoose-web</span> 생성 · GitHub 연결 (앞으로 <b>push하면 자동 재배포</b>)</li>
+      <li>환경변수 3개 설정 (Supabase URL/키 · 구글맵 키)</li>
+      <li><b>라이브 주소</b>: <a href="https://mammoose-web-production.up.railway.app" target="_blank" rel="noreferrer">mammoose-web-production.up.railway.app</a> — 접속하면 로그인 화면 뜸</li>
+    </ul>
+  </div>
+
+  <h2>내일 아침 — 사용자가 할 일 (약 15분)</h2>
+  <p class="h2sub">지금 로그인 버튼을 눌러도 <b>되돌아올 때 실패</b>합니다. 아래를 해야 라이브 주소에서 로그인이 완성돼요.</p>
   <ol class="steps">
-    <li>어색한 곳 없나 한 바퀴 (특히 로그인 → 여행 데이터 저장 → 동행자 초대)</li>
-    <li>위 "배포 전에 하면 좋은 것" 중 할 것 결정 (안 해도 배포 가능)</li>
-    <li>GitHub 저장소 만들기 (같이 진행)</li>
-    <li>Railway 연결 → 자동 배포 → 나온 주소를 <b>Supabase Redirect URLs</b> · <b>카카오/구글 플랫폼</b> · (쓴다면) <b>구글맵 키 제한</b>에 추가</li>
-    <li>폰에서 실제 사용 시작 🦌</li>
+    <li><b>Supabase</b> — <a href="https://supabase.com/dashboard/project/jjrbzojkiurayxapkpor/auth/url-configuration" target="_blank" rel="noreferrer">Authentication → URL Configuration</a>
+      <ul>
+        <li>Site URL 을 아래로 변경:
+          <div class="copy"><code>https://mammoose-web-production.up.railway.app</code><button data-c="https://mammoose-web-production.up.railway.app">복사</button></div>
+        </li>
+        <li>Redirect URLs 에 <b>Add URL</b> (localhost 줄은 그대로 두고 추가):
+          <div class="copy"><code>https://mammoose-web-production.up.railway.app/**</code><button data-c="https://mammoose-web-production.up.railway.app/**">복사</button></div>
+        </li>
+        <li>Save</li>
+      </ul>
+    </li>
+    <li><b>카카오</b> — <a href="https://developers.kakao.com" target="_blank" rel="noreferrer">developers.kakao.com</a> → 맘무스 → 앱 설정 → 플랫폼 → Web 플랫폼 <b>사이트 도메인 추가</b>:
+      <div class="copy"><code>https://mammoose-web-production.up.railway.app</code><button data-c="https://mammoose-web-production.up.railway.app">복사</button></div>
+      <span class="note">(카카오 로그인 Redirect URI 는 그대로 — Supabase 콜백이라 안 바뀜)</span>
+    </li>
+    <li><b>구글맵 API 키 보호</b> (전에 말한 그 화면) — 웹사이트 제한에 아래 추가 + Geocoding API·Distance Matrix API 활성화 (위 "구글 지도 세팅" 섹션 참고):
+      <div class="copy"><code>mammoose-web-production.up.railway.app/*</code><button data-c="mammoose-web-production.up.railway.app/*">복사</button></div>
+    </li>
+    <li><b>테스트</b> — 폰에서 <a href="https://mammoose-web-production.up.railway.app" target="_blank" rel="noreferrer">라이브 주소</a> 접속 → 카카오/구글 로그인 → 앱 진입 확인 → 동행자 초대 코드 만들어서 상대방과 연결</li>
+    <li>(선택) 구글 로그인 "테스트 사용자"에 동행자 이메일 추가 / 앱 게시 — 그래야 등록 안 한 계정도 로그인됨</li>
   </ol>
+  <div class="callout">앞으로 코드를 고치면 <b>GitHub에 push만 하면 라이브 주소에 자동 반영</b>됩니다. (개발용 localhost:5173 는 그대로 계속 사용)</div>
 
   <footer>맘무스 · 큰맘 먹고 떠나는 커플 여행 — 배포 전 점검 · 2026-09-03</footer>
 </div>
