@@ -1,0 +1,39 @@
+{
+  "name": "mammoose",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "node src/store/history.test.mts && node src/lib/currency.test.mts && node src/lib/timezone.test.mts",
+    "preview": "vite preview --host 0.0.0.0 --port ${PORT:-4173}",
+    "start": "vite preview --host 0.0.0.0 --port ${PORT:-4173}"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.1.0",
+    "@dnd-kit/sortable": "^8.0.0",
+    "@react-google-maps/api": "^2.19.3",
+    "@supabase/supabase-js": "^2.114.0",
+    "big.js": "^6.2.2",
+    "framer-motion": "^11.3.0",
+    "lucide-react": "^0.400.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/big.js": "^6.2.2",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
+  }
+}

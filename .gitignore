@@ -1,0 +1,16 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+.env
+.env.*
+!.env.example
+.vscode/*
+!.vscode/extensions.json
+
+# 원본 기획/데이터 자료 (빌드엔 불필요 — 시드는 src/data/seed.ts 에 반영됨)
+0*_*.txt
+0*_*.xlsx
+*_마스코트_캐릭터_시트.png
+triple_app_manual_*.html

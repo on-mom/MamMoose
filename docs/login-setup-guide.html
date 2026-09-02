@@ -1,0 +1,646 @@
+<title>맘무스 로그인 연동 가이드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+
+<style>
+  :root {
+    --ground: #faf7f8;
+    --surface: #ffffff;
+    --surface-2: #f4edf0;
+    --ink: #241f26;
+    --ink-soft: #6c6472;
+    --ink-faint: #938a99;
+    --border: #e8e0e4;
+    --border-strong: #d8ccd3;
+    --accent: #c4437f;
+    --accent-fill: #e2679f;
+    --supabase: #2bb673;
+    --google: #3b78e7;
+    --kakao: #f4d23c;
+    --kakao-ink: #3a1d1d;
+    --warn-bg: #fff5e8;
+    --warn-border: #eec18a;
+    --warn-ink: #8a591c;
+    --ok: #2c9c6d;
+    --shadow: 0 1px 2px rgba(36,31,38,.05), 0 8px 24px -12px rgba(36,31,38,.12);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #161319;
+      --surface: #201c25;
+      --surface-2: #29232f;
+      --ink: #ece7ee;
+      --ink-soft: #a99fb3;
+      --ink-faint: #7c7286;
+      --border: #342d3c;
+      --border-strong: #453c4f;
+      --accent: #f472b6;
+      --accent-fill: #f472b6;
+      --supabase: #3ecf8e;
+      --google: #82a9f4;
+      --kakao: #fee500;
+      --kakao-ink: #3a1d1d;
+      --warn-bg: #382b18;
+      --warn-border: #6f5327;
+      --warn-ink: #edc07d;
+      --ok: #48c48d;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #161319;
+    --surface: #201c25;
+    --surface-2: #29232f;
+    --ink: #ece7ee;
+    --ink-soft: #a99fb3;
+    --ink-faint: #7c7286;
+    --border: #342d3c;
+    --border-strong: #453c4f;
+    --accent: #f472b6;
+    --accent-fill: #f472b6;
+    --supabase: #3ecf8e;
+    --google: #82a9f4;
+    --kakao: #fee500;
+    --kakao-ink: #3a1d1d;
+    --warn-bg: #382b18;
+    --warn-border: #6f5327;
+    --warn-ink: #edc07d;
+    --ok: #48c48d;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.55);
+  }
+
+  * { box-sizing: border-box; }
+  html { overflow-x: hidden; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Noto Sans KR", system-ui, sans-serif;
+    font-size: 15.5px;
+    line-height: 1.72;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  h1, h2, h3 { font-family: "IBM Plex Sans KR", "Noto Sans KR", sans-serif; text-wrap: balance; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in srgb, var(--ground) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-inner {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 12px 24px 10px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .topbar-title { font-weight: 600; font-size: 14.5px; letter-spacing: -.01em; }
+  .topbar-title span { color: var(--accent); }
+  .progress { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .progress-track { width: 88px; height: 5px; border-radius: 99px; background: var(--surface-2); overflow: hidden; border: 1px solid var(--border); }
+  .progress-fill { height: 100%; width: 0; background: var(--accent-fill); border-radius: 99px; transition: width .45s cubic-bezier(.4,0,.2,1); }
+
+  /* ---------- layout ---------- */
+  main { max-width: 680px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  .intro h1 { margin: 0 0 14px; font-size: 27px; font-weight: 700; letter-spacing: -.02em; line-height: 1.32; }
+  .intro p { margin: 0 0 12px; color: var(--ink-soft); }
+  .intro strong { color: var(--ink); font-weight: 600; }
+
+  .order {
+    margin: 22px 0 8px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    font-size: 13.5px;
+  }
+  .order b { color: var(--accent); font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+  .order span { color: var(--ink-soft); }
+
+  /* ---------- phase card ---------- */
+  .phase {
+    position: relative;
+    margin-top: 30px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--rail);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px 26px 26px;
+    animation: rise .5s ease backwards;
+  }
+  .phase:nth-of-type(2) { animation-delay: .04s; }
+  .phase:nth-of-type(3) { animation-delay: .08s; }
+  .phase:nth-of-type(4) { animation-delay: .12s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+
+  .phase.done { opacity: .62; }
+  .phase.done .phase-body { opacity: .5; }
+
+  .phase-head { display: flex; align-items: flex-start; gap: 13px; }
+  .badge {
+    flex: none;
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    display: grid; place-items: center;
+    font-family: "IBM Plex Sans KR", sans-serif;
+    font-weight: 700; font-size: 16px;
+    background: var(--rail);
+    color: #fff;
+  }
+  .badge.kakao { color: var(--kakao-ink); }
+  .phase-head h2 { margin: 0; font-size: 19.5px; font-weight: 600; letter-spacing: -.015em; }
+  .eyebrow {
+    display: block;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: .13em; text-transform: uppercase;
+    color: var(--rail);
+    margin-bottom: 3px;
+  }
+  .eyebrow.on-kakao { color: color-mix(in srgb, var(--kakao) 60%, var(--ink)); }
+
+  .est { margin-left: auto; flex: none; font-size: 12px; color: var(--ink-faint); padding-top: 4px; white-space: nowrap; }
+
+  .phase-body { margin-top: 16px; }
+  .sub {
+    margin: 20px 0 8px;
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    font-family: "IBM Plex Sans KR", sans-serif;
+  }
+
+  ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; }
+  ol.steps > li {
+    position: relative;
+    counter-increment: s;
+    padding: 9px 0 9px 34px;
+    border-top: 1px solid var(--border);
+  }
+  ol.steps > li:first-child { border-top: none; }
+  ol.steps > li::before {
+    content: counter(s);
+    position: absolute; left: 0; top: 8px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    color: var(--ink-soft);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px; font-weight: 600;
+    display: grid; place-items: center;
+  }
+  ol.steps b { font-weight: 600; }
+  ol.steps .path {
+    font-family: "IBM Plex Sans KR", sans-serif;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 5px;
+    font-size: 13px;
+    line-height: 1.9;
+    box-decoration-break: clone;
+  }
+  ol.steps ul { margin: 6px 0 2px; padding-left: 18px; }
+  ol.steps ul li { margin: 2px 0; color: var(--ink-soft); }
+
+  /* copy / code */
+  .copy {
+    margin: 8px 0 2px;
+    display: flex; align-items: stretch; gap: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 9px;
+    overflow: hidden;
+    background: var(--surface-2);
+  }
+  .copy code {
+    flex: 1;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    padding: 9px 12px;
+    overflow-wrap: anywhere;
+    color: var(--ink);
+    align-self: center;
+  }
+  .copy .ph { color: var(--accent); border-bottom: 1px dashed currentColor; }
+  .copy button {
+    flex: none;
+    border: none; border-left: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink-soft);
+    font-family: "IBM Plex Sans KR", sans-serif;
+    font-size: 12px; font-weight: 600;
+    padding: 0 14px;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .copy button:hover { background: var(--accent-fill); color: #fff; }
+  .copy button.ok { background: var(--ok); color: #fff; }
+
+  .callout {
+    margin: 12px 0 2px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    color: var(--warn-ink);
+  }
+  .callout.info {
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+    color: var(--ink-soft);
+  }
+  .callout b { color: inherit; }
+
+  .phase-check {
+    margin-top: 22px;
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-2);
+    cursor: pointer;
+    user-select: none;
+    font-size: 13.5px; font-weight: 600;
+  }
+  .phase-check input { width: 17px; height: 17px; accent-color: var(--accent-fill); cursor: pointer; flex: none; }
+  .phase-check.checked { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--border)); }
+
+  /* ---------- handoff ---------- */
+  .handoff {
+    margin-top: 36px;
+    padding: 26px;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+    border: 1.5px solid color-mix(in srgb, var(--accent) 32%, var(--border));
+  }
+  .handoff h2 { margin: 0 0 4px; font-size: 20px; font-weight: 700; letter-spacing: -.015em; }
+  .handoff > p { margin: 0 0 16px; color: var(--ink-soft); font-size: 13.5px; }
+  .give { display: grid; gap: 8px; }
+  .give .copy { background: var(--surface); }
+  .nope {
+    margin: 18px 0 0; padding: 14px 16px;
+    border-radius: 10px;
+    background: var(--warn-bg); border: 1px solid var(--warn-border);
+    color: var(--warn-ink); font-size: 13px;
+  }
+  .nope b { display: block; margin-bottom: 5px; }
+  .nope ul { margin: 0; padding-left: 18px; }
+  .nope li { margin: 2px 0; }
+
+  footer {
+    margin-top: 44px; padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 12.5px; color: var(--ink-faint);
+    text-align: center;
+  }
+  footer b { color: var(--ink-soft); }
+
+  a { color: var(--accent); text-underline-offset: 2px; }
+  :focus-visible { outline: 2px solid var(--accent-fill); outline-offset: 2px; border-radius: 4px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+  @media (max-width: 520px) {
+    main { padding: 28px 16px 60px; }
+    .phase { padding: 20px 17px 22px; }
+    .est { display: none; }
+    .copy { flex-direction: column; }
+    .copy button { border-left: none; border-top: 1px solid var(--border-strong); padding: 8px; }
+  }
+</style>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-title">맘무스 <span>로그인 연동</span> 가이드</div>
+    <div class="progress">
+      <span><b class="progress-count">0</b> / 4 단계</span>
+      <span class="progress-track"><span class="progress-fill"></span></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="intro">
+    <h1>카카오·구글 로그인과 동행자 공유를 켜기 위한 4단계 준비</h1>
+    <p>맘무스 앱에 <strong>회원가입(카카오/구글)</strong>과 <strong>동행자 초대·실시간 공유</strong>를 붙이려면
+      데이터와 로그인을 맡아줄 서버가 필요합니다. <strong>Supabase</strong>라는 무료 서비스를 씁니다.
+      코딩은 필요 없고, 웹사이트 4곳에서 버튼을 누르고 값을 복사하는 작업입니다.</p>
+    <p>아래 순서대로만 하면 됩니다. 전부 지금 바로 가능하고, 앱을 인터넷에 올리는(Railway 배포) 작업은
+      나중에 해도 됩니다. 총 <strong>약 30분</strong>.</p>
+
+    <div class="order">
+      <b>1</b><span>Supabase 프로젝트 만들기 &nbsp;— 여기서 나오는 <em>콜백 주소</em>를 2·3단계에서 씁니다</span>
+      <b>2</b><span>구글 로그인 연결</span>
+      <b>3</b><span>카카오 로그인 연결</span>
+      <b>4</b><span>Supabase에 앱 주소 등록</span>
+    </div>
+    <div class="callout info" style="margin-top:14px">
+      💡 <b>준비물</b> — 구글 계정, 카카오 계정, 그리고 GitHub 계정(없으면 Supabase 가입 때 이메일로 가입 가능).
+      진행 중 헷갈리면 그 화면을 <b>스크린샷 찍어서 채팅에 붙여넣어</b> 주세요. 바로 짚어드리겠습니다.
+    </div>
+  </div>
+
+  <!-- ============ PHASE 1 ============ -->
+  <section class="phase" data-phase="1" style="--rail: var(--supabase)">
+    <div class="phase-head">
+      <div class="badge">S</div>
+      <div>
+        <span class="eyebrow">STEP 1 · Supabase</span>
+        <h2>Supabase 프로젝트 만들기</h2>
+      </div>
+      <span class="est">약 5분</span>
+    </div>
+
+    <div class="phase-body">
+      <ol class="steps">
+        <li><a href="https://supabase.com" target="_blank" rel="noreferrer">supabase.com</a> 접속 →
+          <b>Start your project</b> → GitHub 계정으로 로그인(또는 <b>Continue with Email</b>로 이메일 가입).</li>
+        <li><b>New project</b> 클릭. 조직(Organization)이 없으면 이름을 하나 입력해 새로 만듭니다 (예: <b>onmom</b>).</li>
+        <li>프로젝트 정보 입력
+          <ul>
+            <li><b>Name</b>: <code>mammoose</code></li>
+            <li><b>Database Password</b>: <b>Generate a password</b> 클릭 → 나온 비밀번호를 <b>메모장 등에 저장</b>
+              (지금은 안 쓰지만 나중에 필요). 채팅엔 붙여넣지 마세요.</li>
+            <li><b>Region</b>: <span class="path">Northeast Asia (Seoul)</span> 선택 — 한국에서 가장 빠릅니다.</li>
+            <li><b>Plan</b>: Free</li>
+          </ul>
+        </li>
+        <li><b>Create new project</b> → 1~2분 기다리면 준비 완료.</li>
+        <li>왼쪽 맨 아래 <b>Project Settings</b>(톱니바퀴 아이콘) → <b>API</b> 메뉴로 이동.</li>
+        <li><b>Project URL</b> 복사 → 이것이 앱에 넣을 <b>첫 번째 값</b>입니다.
+          <div class="copy">
+            <code>https://<span class="ph">프로젝트ID</span>.supabase.co</code>
+            <button data-copy="https://프로젝트ID.supabase.co">복사</button>
+          </div>
+        </li>
+        <li>같은 화면의 <b>Project API keys</b>에서 <b>anon</b> / <b>public</b> 키(아주 긴 문자열)를 복사 →
+          앱에 넣을 <b>두 번째 값</b>. (새 UI에서는 <b>publishable</b> 키로 표시될 수도 있습니다. 둘 중 있는 것.)
+          <div class="callout info">이 두 값은 <b>공개되어도 안전한</b> 값이라 나중에 채팅으로 주셔도 됩니다.
+            반대로 <b>service_role</b> / <b>secret</b> 키는 절대 공유하지 마세요.</div>
+        </li>
+        <li>마지막으로 <b>콜백 주소</b>를 메모해 둡니다. Project URL 뒤에 <code>/auth/v1/callback</code>을 붙인 형태:
+          <div class="copy">
+            <code>https://<span class="ph">프로젝트ID</span>.supabase.co/auth/v1/callback</code>
+            <button data-copy="https://프로젝트ID.supabase.co/auth/v1/callback">복사</button>
+          </div>
+          👉 2단계(구글)와 3단계(카카오)에서 이 주소를 붙여넣습니다. <b>프로젝트ID</b> 부분은 본인 값으로 바꾸세요.
+        </li>
+      </ol>
+
+      <label class="phase-check"><input type="checkbox"> 1단계 완료</label>
+    </div>
+  </section>
+
+  <!-- ============ PHASE 2 ============ -->
+  <section class="phase" data-phase="2" style="--rail: var(--google)">
+    <div class="phase-head">
+      <div class="badge">G</div>
+      <div>
+        <span class="eyebrow">STEP 2 · Google</span>
+        <h2>구글 로그인 연결</h2>
+      </div>
+      <span class="est">약 10분</span>
+    </div>
+
+    <div class="phase-body">
+      <p class="sub">A. 구글 클라우드에서 로그인 키 만들기</p>
+      <ol class="steps">
+        <li><a href="https://console.cloud.google.com" target="_blank" rel="noreferrer">console.cloud.google.com</a> 접속 → 구글 로그인.</li>
+        <li>상단 프로젝트 선택 메뉴 → <b>새 프로젝트</b> → 이름 <code>mammoose</code> → <b>만들기</b> →
+          만든 프로젝트를 선택.</li>
+        <li>왼쪽 메뉴(또는 상단 검색창)에서 <span class="path">API 및 서비스 → OAuth 동의 화면</span>
+          (신 화면에서는 <span class="path">Google 인증 플랫폼</span>).
+          <ul>
+            <li>User Type: <b>External(외부)</b> → 만들기</li>
+            <li>앱 이름 <code>맘무스</code>, 사용자 지원 이메일·개발자 이메일에 <b>본인 이메일</b> 입력 → 저장 후 계속</li>
+            <li>범위(Scopes) 화면은 그대로 <b>저장 후 계속</b></li>
+            <li>테스트 사용자: <b>+ ADD USERS</b> → <b>본인 구글 이메일 + 동행자 구글 이메일</b> 추가 → 저장 후 계속</li>
+          </ul>
+          <div class="callout">앱이 “테스트” 상태인 동안엔 여기 등록한 이메일만 로그인됩니다.
+            나중에 <b>게시(Publish)</b>하면 누구나 로그인할 수 있습니다 (기본 정보만 쓰므로 별도 심사 없음, 경고 화면만 표시).</div>
+        </li>
+        <li><span class="path">API 및 서비스 → 사용자 인증 정보</span> → 상단 <b>+ 사용자 인증 정보 만들기</b> →
+          <b>OAuth 클라이언트 ID</b>
+          <ul>
+            <li>애플리케이션 유형: <b>웹 애플리케이션</b></li>
+            <li>이름: <code>mammoose web</code></li>
+            <li><b>승인된 리디렉션 URI</b> → <b>+ URI 추가</b> → 1단계의 콜백 주소 붙여넣기:</li>
+          </ul>
+          <div class="copy">
+            <code>https://<span class="ph">프로젝트ID</span>.supabase.co/auth/v1/callback</code>
+            <button data-copy="https://프로젝트ID.supabase.co/auth/v1/callback">복사</button>
+          </div>
+          → <b>만들기</b>
+        </li>
+        <li>팝업에 나온 <b>클라이언트 ID</b>와 <b>클라이언트 보안 비밀번호(Client Secret)</b>를 복사.
+          <div class="callout">이 둘은 <b>Supabase에만</b> 입력합니다. 채팅에 붙여넣지 마세요.</div>
+        </li>
+      </ol>
+
+      <p class="sub">B. Supabase에 붙여넣기</p>
+      <ol class="steps">
+        <li>Supabase 대시보드 → 왼쪽 <b>Authentication</b> → <b>Sign In / Providers</b> → 목록에서 <b>Google</b> 클릭.</li>
+        <li><b>Enable Sign in with Google</b> 켜기 →
+          <b>Client ID</b>에 클라이언트 ID, <b>Client Secret</b>에 보안 비밀번호 붙여넣기 → <b>Save</b>.</li>
+      </ol>
+
+      <label class="phase-check"><input type="checkbox"> 2단계 완료</label>
+    </div>
+  </section>
+
+  <!-- ============ PHASE 3 ============ -->
+  <section class="phase" data-phase="3" style="--rail: var(--kakao)">
+    <div class="phase-head">
+      <div class="badge kakao">K</div>
+      <div>
+        <span class="eyebrow on-kakao">STEP 3 · Kakao</span>
+        <h2>카카오 로그인 연결</h2>
+      </div>
+      <span class="est">약 10분</span>
+    </div>
+
+    <div class="phase-body">
+      <p class="sub">A. 카카오 개발자 앱 만들기</p>
+      <ol class="steps">
+        <li><a href="https://developers.kakao.com" target="_blank" rel="noreferrer">developers.kakao.com</a> →
+          카카오계정 로그인 → 상단 <b>내 애플리케이션</b> → <b>애플리케이션 추가하기</b>
+          <ul>
+            <li>앱 이름: <code>맘무스</code></li>
+            <li>사업자명: 개인이면 본인 이름 또는 팀 이름</li>
+          </ul>
+        </li>
+        <li>만든 앱 클릭 → 왼쪽 <span class="path">앱 설정 → 앱 키</span> →
+          <b>REST API 키</b> 복사 (Supabase에서 “Client ID”로 씁니다).</li>
+        <li>왼쪽 <span class="path">카카오 로그인</span> → <b>활성화 설정</b>을 <b>ON</b>.</li>
+        <li>같은 페이지 아래 <b>Redirect URI</b> → <b>Redirect URI 등록</b> → 1단계 콜백 주소 붙여넣기 → 저장:
+          <div class="copy">
+            <code>https://<span class="ph">프로젝트ID</span>.supabase.co/auth/v1/callback</code>
+            <button data-copy="https://프로젝트ID.supabase.co/auth/v1/callback">복사</button>
+          </div>
+        </li>
+        <li>왼쪽 <span class="path">카카오 로그인 → 동의항목</span>에서
+          <b>닉네임</b>을 “필수 동의”로 설정 (프로필 사진·이메일은 선택).
+          <div class="callout">이메일 항목은 별도 검수가 필요할 수 있습니다. <b>닉네임만으로도 로그인은 작동</b>하니
+            우선 닉네임만 켜고 넘어가도 됩니다.</div>
+        </li>
+        <li>왼쪽 <span class="path">앱 설정 → 플랫폼</span> → <b>Web 플랫폼 등록</b> → 사이트 도메인에 추가:
+          <div class="copy">
+            <code>http://localhost:5173</code>
+            <button data-copy="http://localhost:5173">복사</button>
+          </div>
+          (인터넷 배포 후에는 그 주소도 여기에 추가합니다.)
+        </li>
+        <li>왼쪽 <span class="path">앱 설정 → 보안</span> → <b>Client Secret</b> → <b>코드 생성</b> →
+          상태를 <b>사용함(ON)</b>으로 → 생성된 코드 복사 (Supabase에서 “Client Secret”으로 씁니다).</li>
+      </ol>
+
+      <p class="sub">B. Supabase에 붙여넣기</p>
+      <ol class="steps">
+        <li>Supabase → <b>Authentication</b> → <b>Sign In / Providers</b> → <b>Kakao</b> 클릭 → 켜기.</li>
+        <li><b>Client ID</b>에 <b>REST API 키</b>, <b>Client Secret</b>에 방금 생성한 <b>Client Secret 코드</b> 붙여넣기 → <b>Save</b>.</li>
+      </ol>
+
+      <label class="phase-check"><input type="checkbox"> 3단계 완료</label>
+    </div>
+  </section>
+
+  <!-- ============ PHASE 4 ============ -->
+  <section class="phase" data-phase="4" style="--rail: var(--supabase)">
+    <div class="phase-head">
+      <div class="badge">S</div>
+      <div>
+        <span class="eyebrow">STEP 4 · Supabase</span>
+        <h2>Supabase에 앱 주소 등록</h2>
+      </div>
+      <span class="est">약 3분</span>
+    </div>
+
+    <div class="phase-body">
+      <ol class="steps">
+        <li>Supabase → <b>Authentication</b> → <b>URL Configuration</b>.</li>
+        <li><b>Site URL</b>: 개발 중에는 아래 값으로 둡니다 (배포 후 Railway 주소로 변경).
+          <div class="copy">
+            <code>http://localhost:5173</code>
+            <button data-copy="http://localhost:5173">복사</button>
+          </div>
+        </li>
+        <li><b>Redirect URLs</b> → <b>Add URL</b>로 아래를 추가:
+          <div class="copy">
+            <code>http://localhost:5173/**</code>
+            <button data-copy="http://localhost:5173/**">복사</button>
+          </div>
+          <div class="copy">
+            <code>https://<span class="ph">앱이름</span>.up.railway.app/**</code>
+            <button data-copy="https://앱이름.up.railway.app/**">복사</button>
+          </div>
+          (Railway 배포 주소가 아직 없으면 첫 줄만. 배포 후에 두 번째 줄 추가.)
+        </li>
+        <li><b>Save</b>.</li>
+      </ol>
+
+      <label class="phase-check"><input type="checkbox"> 4단계 완료</label>
+    </div>
+  </section>
+
+  <!-- ============ HANDOFF ============ -->
+  <section class="handoff">
+    <h2>다 됐으면 — 저에게 이 2개만 보내주세요</h2>
+    <p>채팅창에 아래 두 값을 붙여넣어 주시면 로그인·공유 기능 코드를 이어서 만들겠습니다. 둘 다 공개돼도 안전한 값입니다.</p>
+    <div class="give">
+      <div class="copy">
+        <code>VITE_SUPABASE_URL = https://<span class="ph">프로젝트ID</span>.supabase.co</code>
+        <button data-copy="VITE_SUPABASE_URL=">복사</button>
+      </div>
+      <div class="copy">
+        <code>VITE_SUPABASE_ANON_KEY = <span class="ph">anon/public 키</span></code>
+        <button data-copy="VITE_SUPABASE_ANON_KEY=">복사</button>
+      </div>
+    </div>
+    <div class="nope">
+      <b>🔒 이건 절대 채팅에 붙여넣지 마세요 (Supabase 화면에만 입력, 이미 저장됨)</b>
+      <ul>
+        <li>구글 클라이언트 보안 비밀번호</li>
+        <li>카카오 REST API 키 · Client Secret</li>
+        <li>Supabase Database Password · service_role(secret) 키</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    받은 값으로 <b>Supabase 연결 → 로그인 화면(카카오·구글로 시작) → 여행 데이터 원격 동기화 → 동행자 초대 코드</b> 순으로 구현합니다.<br>
+    막히는 화면은 스크린샷으로 물어보세요 · 맘무스 🫎
+  </footer>
+</main>
+
+<script>
+  (function () {
+    var KEY = 'mammoose-setup-progress';
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+
+    var phases = Array.prototype.slice.call(document.querySelectorAll('.phase'));
+    var countEl = document.querySelector('.progress-count');
+    var fillEl = document.querySelector('.progress-fill');
+
+    function refresh() {
+      var done = 0;
+      phases.forEach(function (p) {
+        var on = p.querySelector('.phase-check input').checked;
+        if (on) done++;
+        p.classList.toggle('done', on);
+        p.querySelector('.phase-check').classList.toggle('checked', on);
+      });
+      countEl.textContent = done;
+      fillEl.style.width = (done / phases.length * 100) + '%';
+    }
+
+    phases.forEach(function (p) {
+      var id = p.getAttribute('data-phase');
+      var box = p.querySelector('.phase-check input');
+      if (saved[id]) box.checked = true;
+      box.addEventListener('change', function () {
+        saved[id] = box.checked;
+        try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+        refresh();
+      });
+    });
+    refresh();
+
+    document.querySelectorAll('.copy button[data-copy]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var text = btn.getAttribute('data-copy');
+        var done = function () {
+          var old = btn.textContent;
+          btn.textContent = '복사됨!';
+          btn.classList.add('ok');
+          setTimeout(function () { btn.textContent = old; btn.classList.remove('ok'); }, 1400);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, done);
+        } else {
+          var t = document.createElement('textarea');
+          t.value = text; document.body.appendChild(t); t.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(t); done();
+        }
+      });
+    });
+  })();
+</script>
