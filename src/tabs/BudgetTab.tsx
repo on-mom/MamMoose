@@ -6,6 +6,7 @@ import { uid } from '../lib/uid';
 import { toKrw, commas, cachedRate, fetchVndKrwRate, FALLBACK_VND_KRW } from '../lib/currency';
 import { useDebounced } from '../lib/useDebounced';
 import { MooseEmpty, Moose } from '../components/Moose';
+import { BottomSheet } from '../components/Modal';
 
 const CATS: ExpenseCategory[] = ['숙소', '쇼핑', '항공', '식사', '체험', '기타'];
 
@@ -55,8 +56,10 @@ export default function BudgetTab() {
   const remove = (id: string) =>
     mutate((doc) => { doc.expenses = doc.expenses.filter((x) => x.id !== id); });
 
+  const [addOpen, setAddOpen] = useState(false);
+
   return (
-    <div className="edge flex h-full flex-col py-3">
+    <div className="edge relative flex h-full flex-col py-3">
       <h2 className="font-title text-xl font-bold text-white">가계부</h2>
 
       {/* 환율 */}
@@ -103,8 +106,6 @@ export default function BudgetTab() {
         />
       </div>
 
-      <AddForm projectId={project.id} rate={rate} />
-
       {/* 필터 */}
       <div className="mt-3 flex gap-2 text-xs">
         <select value={fCat} onChange={(e) => setFCat(e.target.value)} className="rounded bg-moose-edge px-2 py-1 text-slate-200 outline-none">
@@ -150,7 +151,16 @@ export default function BudgetTab() {
       </ul>
 
       {/* 하단 고정 합계 */}
-      <div className="mt-2 border-t border-moose-edge pt-2">
+      <div className="relative mt-2 border-t border-moose-edge pt-2">
+        {/* 지출 추가 FAB (엄지 접근) */}
+        <button
+          onClick={() => setAddOpen(true)}
+          className="btn-heart absolute -top-16 right-0 z-30 flex h-14 w-14 items-center justify-center rounded-full shadow-lg"
+          aria-label="지출 추가"
+        >
+          <Plus size={26} />
+        </button>
+
         {budget > 0 && (
           <div className="mb-2">
             <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
@@ -189,11 +199,17 @@ export default function BudgetTab() {
           </div>
         </div>
       </div>
+
+      {addOpen && (
+        <BottomSheet title="지출 추가" onClose={() => setAddOpen(false)}>
+          <AddForm projectId={project.id} rate={rate} onDone={() => setAddOpen(false)} />
+        </BottomSheet>
+      )}
     </div>
   );
 }
 
-function AddForm({ projectId, rate }: { projectId: string; rate: number }) {
+function AddForm({ projectId, rate, onDone }: { projectId: string; rate: number; onDone: () => void }) {
   const mutate = useAppStore((s) => s.mutate);
   const today = new Date().toISOString().slice(0, 10);
   const [f, setF] = useState({ date: today, category: '식사' as ExpenseCategory, categoryEtc: '', vendor: '', amount: '' });
@@ -217,10 +233,11 @@ function AddForm({ projectId, rate }: { projectId: string; rate: number }) {
       });
     });
     setF({ ...f, vendor: '', amount: '', categoryEtc: '' });
+    onDone();
   };
 
   return (
-    <div className="mt-3 space-y-2 card border-0 p-3 text-xs">
+    <div className="space-y-2 text-xs">
       <div className="flex gap-2">
         <input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })}
           className="rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />

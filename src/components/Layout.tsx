@@ -75,9 +75,9 @@ export default function Layout() {
       </header>
 
       {/* 탭 콘텐츠 — key로 리마운트해 CSS fade-in + 탭별 오류 격리 */}
-      <main className="pb-tabbar relative flex-1 overflow-y-auto">
+      <main className="pb-tabbar relative flex flex-1 flex-col overflow-y-auto">
         <ErrorBoundary key={activeTab}>
-          <div className="animate-[fade_.18s_ease]">
+          <div className="flex min-h-0 flex-1 flex-col animate-[fade_.18s_ease] [&>*]:min-h-0 [&>*]:flex-1">
             <View />
           </div>
         </ErrorBoundary>

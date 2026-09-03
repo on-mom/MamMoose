@@ -19,20 +19,25 @@ const mapQ = (name: string) => `https://maps.google.com/?q=${encodeURIComponent(
 export default function RestaurantsTab() {
   const [view, setView] = useState<'place' | 'stay'>('place');
   return (
-    <div className="edge space-y-3 py-3">
-      <h2 className="font-title text-xl font-bold text-white">{view === 'place' ? '장소' : '숙소 후보'}</h2>
-      <div className="flex gap-1 rounded-lg bg-moose-dusk p-1 text-xs">
-        {([['place', '장소'], ['stay', '숙소']] as const).map(([k, l]) => (
-          <button
-            key={k}
-            onClick={() => setView(k)}
-            className={`flex-1 rounded-md py-1.5 ${view === k ? 'btn-heart' : 'text-slate-400'}`}
-          >
-            {l}
-          </button>
-        ))}
+    <div className="flex h-full flex-col">
+      <div className="edge min-h-0 flex-1 space-y-3 overflow-y-auto py-3">
+        <h2 className="font-title text-xl font-bold text-white">{view === 'place' ? '장소' : '숙소 후보'}</h2>
+        {view === 'place' ? <PlacesView embedded /> : <StayView />}
       </div>
-      {view === 'place' ? <PlacesView embedded /> : <StayView />}
+      {/* 하단 고정 전환 바 (엄지 접근) */}
+      <div className="edge shrink-0 border-t border-moose-edge bg-moose-night/95 py-2 backdrop-blur">
+        <div className="flex gap-1 rounded-lg bg-moose-dusk p-1 text-xs">
+          {([['place', '장소'], ['stay', '숙소']] as const).map(([k, l]) => (
+            <button
+              key={k}
+              onClick={() => setView(k)}
+              className={`flex-1 rounded-md py-2 ${view === k ? 'btn-heart' : 'text-slate-400'}`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

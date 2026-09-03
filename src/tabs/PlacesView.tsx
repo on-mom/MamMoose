@@ -106,16 +106,18 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
   );
 
   return (
-    <div className={embedded ? 'space-y-2.5' : 'edge space-y-2.5 py-3'}>
-      {/* 검색 바 */}
-      <button
-        onClick={() => setSheetOpen(true)}
-        className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-moose-dusk/70 px-3 py-2.5 text-left"
-      >
-        <Search size={15} className="shrink-0 text-moose-heart" />
-        <span className="min-w-0 flex-1 truncate text-[13px] text-slate-200">{filterSummary(filter)}</span>
-        <span className="shrink-0 text-[11px] text-slate-500">{results.length}곳</span>
-      </button>
+    <div className={embedded ? 'flex flex-col gap-2.5' : 'edge space-y-2.5 py-3'}>
+      {/* 검색 바 — 임베드 시 하단 고정(엄지 접근) */}
+      <div className={embedded ? 'order-last sticky bottom-0 z-20 -mx-2.5 -mb-1 bg-moose-night/95 px-2.5 pb-1 pt-2 backdrop-blur' : ''}>
+        <button
+          onClick={() => setSheetOpen(true)}
+          className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-moose-dusk/70 px-3 py-2.5 text-left"
+        >
+          <Search size={15} className="shrink-0 text-moose-heart" />
+          <span className="min-w-0 flex-1 truncate text-[13px] text-slate-200">{filterSummary(filter)}</span>
+          <span className="shrink-0 text-[11px] text-slate-500">{results.length}곳</span>
+        </button>
+      </div>
 
       {/* 액션 줄 */}
       <div className="flex items-center justify-between text-xs">
@@ -213,7 +215,7 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
 
       {/* 다중선택 담기 바 */}
       {selMode && picked.size > 0 && (
-        <div className="sticky bottom-2 z-10 flex items-center gap-2 rounded-xl bg-moose-heart px-3 py-2 text-sm font-semibold text-white shadow-lg">
+        <div className="sticky bottom-16 z-10 flex items-center gap-2 rounded-xl bg-moose-heart px-3 py-2 text-sm font-semibold text-white shadow-lg">
           <span className="flex-1">{picked.size}곳 선택</span>
           <select
             value={day}

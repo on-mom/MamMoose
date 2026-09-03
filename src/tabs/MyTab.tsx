@@ -73,12 +73,14 @@ export default function MyTab() {
           여행이 끝났어요 — 추억함에서 둘이 함께 좋아한 {picks.length}곳을 확인해 보세요
         </button>
       )}
-      {sub === 'chat' && <Chat />}
-      {sub === 'diary' && <DiaryView />}
-      {sub === 'memories' && <MemoriesView />}
-      {sub === 'tools' && <ToolsView />}
-      {sub === 'trips' && <Trips />}
-      {sub === 'settings' && <Settings />}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {sub === 'chat' && <Chat />}
+        {sub === 'diary' && <DiaryView />}
+        {sub === 'memories' && <MemoriesView />}
+        {sub === 'tools' && <ToolsView />}
+        {sub === 'trips' && <Trips />}
+        {sub === 'settings' && <Settings />}
+      </div>
     </div>
   );
 }
