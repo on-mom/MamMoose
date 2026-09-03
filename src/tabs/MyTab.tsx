@@ -491,12 +491,12 @@ function Trips() {
             className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-white/10 py-3 text-xs text-slate-400">
             <Plus size={14} /> 여행 프로젝트 추가
           </button>
-          {!projects.some((p) => p.id === 'hanoi-2026-09') && (
+          {!projects.some((p) => p.id.startsWith('sample-')) && (
             <button
               onClick={() => setActive(loadHanoiSample())}
               className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-white/10 py-2.5 text-[11px] text-slate-500"
             >
-              🫎 예시 여행 담기 · 하노이 3일 (맛집·관광지·숙소 샘플)
+              🫎 예시 여행 담기 · 하노이 3일 (가상 데이터 · 자유롭게 삭제)
             </button>
           )}
         </div>
@@ -613,12 +613,20 @@ function TripHeadline({ project, onEditRules }: { project: Project; onEditRules:
 }
 
 /* ---------- 여행 추가/수정 폼 ---------- */
+/** 기기 시간대가 목록에 있으면 그걸, 없으면 서울을 기본값으로 */
+function deviceTz(): string {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return CITY_TZ.some((c) => c.tz === tz) ? tz : 'Asia/Seoul';
+  } catch { return 'Asia/Seoul'; }
+}
+
 function toForm(p?: Project): TripFormData {
   const fl = (x?: import('../types').Flight): FlightForm => ({ ...BLANK_FLIGHT, ...(x ?? {}), carrier: x?.carrier ?? '' });
   return {
     name: p?.name ?? '', destination: p?.destination ?? '',
     startDate: p?.startDate ?? '', endDate: p?.endDate ?? '',
-    timezone: p?.timezone ?? 'Asia/Ho_Chi_Minh',
+    timezone: p?.timezone ?? deviceTz(),
     outbound: fl(p?.outbound), inbound: fl(p?.inbound),
   };
 }
@@ -636,11 +644,23 @@ function TripForm({ initial, onSubmit, onCancel }: {
 
   return (
     <div className="space-y-2 card border-0 p-3 text-xs">
-      <input value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} placeholder="여행 이름 (필수)" className={`w-full ${inp}`} />
-      <input value={d.destination} onChange={(e) => setD({ ...d, destination: e.target.value })} placeholder="목적지  ex) 베트남 하노이" className={`w-full ${inp}`} />
+      <label className="block">
+        <span className="text-[10px] text-slate-500">여행 이름 (필수)</span>
+        <input value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} placeholder="예: 우리 첫 도쿄 여행" className={`mt-0.5 w-full ${inp}`} />
+      </label>
+      <label className="block">
+        <span className="text-[10px] text-slate-500">여행지 (도시 · 나라)</span>
+        <input value={d.destination} onChange={(e) => setD({ ...d, destination: e.target.value })} placeholder="예: 도쿄, 일본" className={`mt-0.5 w-full ${inp}`} />
+      </label>
       <div className="flex gap-2">
-        <input type="date" value={d.startDate} onChange={(e) => setD({ ...d, startDate: e.target.value })} className={`flex-1 ${inp}`} />
-        <input type="date" value={d.endDate} onChange={(e) => setD({ ...d, endDate: e.target.value })} className={`flex-1 ${inp}`} />
+        <label className="flex-1">
+          <span className="text-[10px] text-slate-500">여행 시작일</span>
+          <input type="date" value={d.startDate} onChange={(e) => setD({ ...d, startDate: e.target.value })} className={`mt-0.5 w-full ${inp}`} />
+        </label>
+        <label className="flex-1">
+          <span className="text-[10px] text-slate-500">여행 종료일</span>
+          <input type="date" value={d.endDate} onChange={(e) => setD({ ...d, endDate: e.target.value })} className={`mt-0.5 w-full ${inp}`} />
+        </label>
       </div>
       <label className="block">
         <span className="text-[10px] text-slate-500">현지 시간대 (여행지)</span>
@@ -654,26 +674,35 @@ function TripForm({ initial, onSubmit, onCancel }: {
         const auto = carrierOf(f.flightNo);
         return (
           <div key={leg} className="space-y-1.5 rounded-lg bg-white/[0.03] p-2">
-            <div className="text-[10px] font-semibold text-slate-500">{leg === 'outbound' ? '✈ 출국편' : '✈ 귀국편'}</div>
+            <div className="text-[10px] font-semibold text-slate-500">{leg === 'outbound' ? '✈ 가는 편 (선택)' : '✈ 오는 편 (선택)'}</div>
             <div className="flex gap-1.5">
-              <input type="date" value={f.date} onChange={(e) => setLeg(leg, 'date', e.target.value)} className={`min-w-0 flex-1 ${inp}`} />
-              <input
-                value={f.flightNo}
-                onChange={(e) => setLeg(leg, 'flightNo', e.target.value)}
-                placeholder="편명  ex) VJ961" className={`w-28 ${inp}`}
-              />
+              <label className="min-w-0 flex-1">
+                <span className="text-[9px] text-slate-600">{leg === 'outbound' ? '출발 날짜' : '귀국 날짜'}</span>
+                <input type="date" value={f.date} onChange={(e) => setLeg(leg, 'date', e.target.value)} className={`mt-0.5 w-full ${inp}`} />
+              </label>
+              <label className="w-28">
+                <span className="text-[9px] text-slate-600">편명</span>
+                <input
+                  value={f.flightNo}
+                  onChange={(e) => setLeg(leg, 'flightNo', e.target.value)}
+                  placeholder="예: KE457" className={`mt-0.5 w-full ${inp}`}
+                />
+              </label>
             </div>
-            <input
-              value={f.carrier || auto}
-              onChange={(e) => setLeg(leg, 'carrier', e.target.value)}
-              placeholder="항공사  ex) 비엣젯항공 (편명 쓰면 자동)"
-              className={`w-full ${inp} ${!f.carrier && auto ? 'text-emerald-400' : ''}`}
-            />
+            <label className="block">
+              <span className="text-[9px] text-slate-600">항공사 (편명 입력 시 자동)</span>
+              <input
+                value={f.carrier || auto}
+                onChange={(e) => setLeg(leg, 'carrier', e.target.value)}
+                placeholder="예: 대한항공"
+                className={`mt-0.5 w-full ${inp} ${!f.carrier && auto ? 'text-emerald-400' : ''}`}
+              />
+            </label>
             <div className="flex items-center gap-1.5">
-              <input value={f.depAirport} onChange={(e) => setLeg(leg, 'depAirport', e.target.value.toUpperCase())} placeholder="ex)ICN" maxLength={4} className={`w-16 uppercase ${inp}`} />
+              <input value={f.depAirport} onChange={(e) => setLeg(leg, 'depAirport', e.target.value.toUpperCase())} placeholder="출발공항" maxLength={4} className={`w-20 uppercase ${inp} placeholder:normal-case`} />
               <input type="time" value={f.depTime} onChange={(e) => setLeg(leg, 'depTime', e.target.value)} className={`min-w-0 flex-1 ${inp}`} />
               <span className="text-slate-600">→</span>
-              <input value={f.arrAirport} onChange={(e) => setLeg(leg, 'arrAirport', e.target.value.toUpperCase())} placeholder="ex)HAN" maxLength={4} className={`w-16 uppercase ${inp}`} />
+              <input value={f.arrAirport} onChange={(e) => setLeg(leg, 'arrAirport', e.target.value.toUpperCase())} placeholder="도착공항" maxLength={4} className={`w-20 uppercase ${inp} placeholder:normal-case`} />
               <input type="time" value={f.arrTime} onChange={(e) => setLeg(leg, 'arrTime', e.target.value)} className={`min-w-0 flex-1 ${inp}`} />
             </div>
           </div>

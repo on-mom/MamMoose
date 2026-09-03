@@ -60,6 +60,8 @@ export interface TimelineItem {
   photos?: string[];
   /** 이 일정을 마쳤는지 (읽기 모드에서 체크) */
   done?: boolean;
+  /** 여행 항공편에서 자동 생성된 행 — 항공편 수정 시 자동 갱신 */
+  flightLeg?: 'outbound' | 'inbound';
 }
 
 /** 참여자 댓글 — 타임라인·장소·맛집·숙소 모달 공용 */

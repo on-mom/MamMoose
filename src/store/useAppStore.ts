@@ -13,11 +13,12 @@ const safeStorage = {
   removeItem: (k: string) => { try { localStorage.removeItem(k); } catch { /* noop */ } },
 };
 import type {
-  AppSettings, Project, TabKey, TripDoc, UserProfile,
+  AppSettings, Project, TabKey, TimelineItem, TripDoc, UserProfile,
 } from '../types';
 import {
   SEED_PROJECT, SEED_RESTAURANTS, SEED_HOTELS, SEED_SPOTS, SEED_TIMELINE,
-  HANOI_PROJECT, blankProject,
+  SEED_TODOS, SEED_EXPENSES, SEED_DIARY, sampleProject, sampleDayIso, blankProject,
+  flightTimelineItem,
 } from '../data/seed';
 import { commit, undo as histUndo, redo as histRedo } from './history';
 
@@ -35,17 +36,34 @@ function emptyDoc(): TripDoc {
   return { timeline: [], restaurants: [], hotels: [], spots: [], todos: [], expenses: [], messages: [], people: {}, diary: [] };
 }
 
-/** 하노이 예시 데이터를 프로젝트에 귀속시켜 문서 생성 */
-function hanoiDoc(projectId: string): TripDoc {
+/** 하노이 예시 데이터를 프로젝트에 귀속시켜 문서 생성 (전부 가상 값) */
+function hanoiDoc(projectId: string, startDate: string): TripDoc {
   return {
     ...emptyDoc(),
     timeline: SEED_TIMELINE.map((t) => ({ ...t, id: uid(), projectId })),
     restaurants: SEED_RESTAURANTS.map((r) => ({ ...r, id: uid(), projectId })),
     hotels: SEED_HOTELS.map((h) => ({ ...h, id: uid(), projectId })),
     spots: SEED_SPOTS.map((s) => ({ ...s, id: uid(), projectId })),
+    todos: SEED_TODOS.map((t) => ({ ...t, id: uid(), projectId })),
+    expenses: SEED_EXPENSES.map(({ dayOffset, ...e }) => ({
+      ...e, id: uid(), projectId, date: sampleDayIso(startDate, dayOffset),
+    })),
+    diary: SEED_DIARY.map(({ dayOffset, ...d }) => ({
+      ...d, id: uid(), projectId, date: sampleDayIso(startDate, dayOffset), createdAt: Date.now(),
+    })),
   };
 }
 const START_PROJECT = blankProject();
+
+/** 여행 항공편 → 타임라인의 항공편 행 (1일차 / 마지막날). 항공편 없으면 빈 배열. */
+function flightRows(projectId: string, p: Pick<Project, 'startDate' | 'endDate' | 'outbound' | 'inbound'>): TimelineItem[] {
+  const days = Math.max(1, Math.round((Date.parse(p.endDate) - Date.parse(p.startDate)) / 86400000) + 1);
+  const rows: TimelineItem[] = [];
+  const has = (f?: { depAirport?: string; flightNo?: string }) => !!(f && (f.depAirport || f.flightNo));
+  if (has(p.outbound)) rows.push({ ...flightTimelineItem('outbound', p.outbound!), id: uid(), projectId, day: 1, order: -1 });
+  if (has(p.inbound)) rows.push({ ...flightTimelineItem('inbound', p.inbound!), id: uid(), projectId, day: days, order: 99 });
+  return rows;
+}
 
 export interface CloudUser {
   id: string;
@@ -141,14 +159,15 @@ export const useAppStore = create<AppState>()(
           future: [],
         }),
       loadHanoiSample: () => {
-        const id = HANOI_PROJECT.id;
+        // 항상 새 로컬 id → 클라우드의 실제 여행과 절대 안 섞임, 늘 깨끗한 예시
+        const proj = { ...sampleProject(), id: `sample-${Date.now().toString(36)}` };
         set((s) => ({
-          projects: s.projects.some((p) => p.id === id) ? s.projects : [...s.projects, { ...HANOI_PROJECT }],
-          present: { ...s.present, [id]: s.present[id] ?? hanoiDoc(id) },
-          activeProjectId: id,
+          projects: [...s.projects, proj],
+          present: { ...s.present, [proj.id]: hanoiDoc(proj.id, proj.startDate) },
+          activeProjectId: proj.id,
           past: [], future: [],
         }));
-        return id;
+        return proj.id;
       },
 
       activeTab: 'schedule',
@@ -160,20 +179,7 @@ export const useAppStore = create<AppState>()(
       addProject: (p) => {
         const id = `trip-${uid()}`;
         const doc = emptyDoc();
-        const totalDays = Math.max(1, Math.round((Date.parse(p.endDate) - Date.parse(p.startDate)) / 86400000) + 1);
-        // 항공편이 있으면 1일차/마지막날 고정 항목으로
-        if (p.outbound) doc.timeline.push({
-          id: uid(), projectId: id, day: 1, order: -1,
-          startTime: p.outbound.depTime || '00:00', durationMin: 120,
-          place: `${p.outbound.depAirport} → ${p.outbound.arrAirport} 출국 (${p.outbound.flightNo})`,
-          lat: null, lng: null, memo: '',
-        });
-        if (p.inbound) doc.timeline.push({
-          id: uid(), projectId: id, day: totalDays, order: 99,
-          startTime: p.inbound.depTime || '00:00', durationMin: 120,
-          place: `${p.inbound.depAirport} → ${p.inbound.arrAirport} 귀국 (${p.inbound.flightNo})`,
-          lat: null, lng: null, memo: '',
-        });
+        doc.timeline = flightRows(id, p);
         set((s) => ({
           projects: [...s.projects, { ...p, id }],
           present: { ...s.present, [id]: doc },
@@ -181,9 +187,19 @@ export const useAppStore = create<AppState>()(
         return id;
       },
       patchProject: (id, patch) =>
-        set((s) => ({
-          projects: s.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-        })),
+        set((s) => {
+          const projects = s.projects.map((p) => (p.id === id ? { ...p, ...patch } : p));
+          const touchesFlights = ['outbound', 'inbound', 'startDate', 'endDate'].some((k) => k in patch);
+          const doc = s.present[id];
+          const proj = projects.find((p) => p.id === id);
+          if (!touchesFlights || !doc || !proj) return { projects };
+          // 항공편/기간이 바뀌면 타임라인 항공편 행 자동 갱신 (사용자 추가 행은 보존)
+          const kept = doc.timeline.filter((t) => !t.flightLeg);
+          return {
+            projects,
+            present: { ...s.present, [id]: { ...doc, timeline: [...flightRows(id, proj), ...kept] } },
+          };
+        }),
       removeProject: (id) =>
         set((s) => {
           if (s.projects.length <= 1) return s; // 마지막 1개는 삭제 불가
@@ -221,9 +237,20 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'mammoose-store',
-      version: 8,
+      version: 9,
       storage: createJSONStorage(() => safeStorage),
       migrate: (persisted: any, from) => {
+        if (from < 9) {
+          // 항공편 자동 생성 행에 flightLeg 태그 (수정 시 자동 갱신되도록)
+          for (const doc of Object.values(persisted?.present ?? {}) as any[]) {
+            for (const t of doc?.timeline ?? []) {
+              if (t.flightLeg) continue;
+              const pl = String(t.place ?? '');
+              if (/→/.test(pl) && /(출국|출발)/.test(pl)) t.flightLeg = 'outbound';
+              else if (/→/.test(pl) && /(귀국|입국|귀가)/.test(pl)) t.flightLeg = 'inbound';
+            }
+          }
+        }
         if (from < 8) {
           // Todo 담당자 단일 → 배열
           for (const doc of Object.values(persisted?.present ?? {}) as any[]) {

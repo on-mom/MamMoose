@@ -1,5 +1,6 @@
-// 02_초기_데이터_샘플.xlsx 기반 시드. (restaurants 의 nameKo 는 수기 추가 필드)
-import type { Restaurant, Hotel, Spot, Project, TimelineItem } from '../types';
+// 하노이 참고 데이터(맛집/호텔/명소)는 공개 정보 기반 예시.
+// 항공편·날짜·일정·가계부·일기는 전부 가상의 예시 값 (개인정보 아님).
+import type { Restaurant, Hotel, Spot, Project, TimelineItem, Todo, Expense, DiaryEntry } from '../types';
 
 export const SEED_RESTAURANTS: Omit<Restaurant, 'id' | 'projectId'>[] = [
   {
@@ -1244,52 +1245,116 @@ export const SEED_SPOTS: Omit<Spot, 'id' | 'projectId'>[] = [
   }
 ];
 
-// 항공권 시트: 두 편 모두 엑셀 날짜 46276(2026-09-11)로 기록됨. 숙소 시트의 '9/11~13 2박'
-// 기준에 맞춰 귀국편은 09-13으로 보정. 실제 일정 확정 시 수정.
-export const SEED_FLIGHTS = [
-  {
-    "label": "출국편",
-    "route": "ICN (11:05) → HAN (13:35)",
-    "carrier": "비엣젯항공 VJ961"
-  },
-  {
-    "label": "입국편",
-    "route": "HAN (16:20) → ICN (22:45)",
-    "carrier": "썬 푸꾸옥 9G410"
-  }
+const localIso = (d: Date) => {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+
+/** 예시 여행 시작일 = 오늘 + 30일 (항상 다가오는 여행처럼 보이도록) */
+function sampleDates() {
+  const s = new Date(); s.setDate(s.getDate() + 30);
+  const e = new Date(s); e.setDate(e.getDate() + 2);
+  return { start: localIso(s), end: localIso(e) };
+}
+
+/** 가상의 예시 항공편 (실제 항공편 아님) */
+export const SAMPLE_FLIGHTS = [
+  { label: '출국편', route: 'ICN (09:30) → HAN (12:40)', carrier: '대한항공 KE457' },
+  { label: '입국편', route: 'HAN (14:10) → ICN (20:35)', carrier: '대한항공 KE458' },
 ] as const;
 
+export const SAMPLE_ID = 'hanoi-2026-09'; // 마이그레이션 호환용 고정 id
+
 /** 하노이 예시 여행 — 기본으로는 안 깔림. MY › 여행 "예시 불러오기"로만 추가. */
-export const HANOI_PROJECT: Project = {
-  id: 'hanoi-2026-09',
-  name: '하노이 커플 여행',
-  destination: '베트남 하노이',
-  startDate: '2026-09-11',
-  endDate: '2026-09-13',
-  timezone: 'Asia/Ho_Chi_Minh', // ICT, UTC+7
-  outbound: { date: '2026-09-11', flightNo: 'VJ961', depAirport: 'ICN', depTime: '11:05', arrAirport: 'HAN', arrTime: '13:35' },
-  inbound: { date: '2026-09-13', flightNo: '9G410', depAirport: 'HAN', depTime: '16:20', arrAirport: 'ICN', arrTime: '22:45' },
-};
-/** 하위호환 alias (persist migrate 등에서 참조) */
+export function sampleProject(): Project {
+  const { start, end } = sampleDates();
+  return {
+    id: SAMPLE_ID,
+    name: '하노이 3일 (예시)',
+    destination: '베트남 하노이',
+    startDate: start,
+    endDate: end,
+    timezone: 'Asia/Ho_Chi_Minh', // ICT, UTC+7
+    outbound: { date: start, flightNo: 'KE457', depAirport: 'ICN', depTime: '09:30', arrAirport: 'HAN', arrTime: '12:40' },
+    inbound: { date: end, flightNo: 'KE458', depAirport: 'HAN', depTime: '14:10', arrAirport: 'ICN', arrTime: '20:35' },
+  };
+}
+/** 하위호환 alias (persist migrate 등에서 참조) — 정적 스냅샷 */
+export const HANOI_PROJECT: Project = sampleProject();
 export const SEED_PROJECT = HANOI_PROJECT;
 
 /** 새 계정/새 앱은 빈 여행으로 시작 (오늘~+2일) */
 export function blankProject(): Project {
   const d = new Date();
-  const iso = (x: Date) => x.toISOString().slice(0, 10);
+  const iso = localIso;
   const end = new Date(d); end.setDate(end.getDate() + 2);
+  let timezone = 'Asia/Seoul';
+  try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || timezone; } catch { /* noop */ }
   return {
     id: 'trip-start',
     name: '새 여행',
     destination: '',
     startDate: iso(d),
     endDate: iso(end),
-    timezone: 'Asia/Ho_Chi_Minh',
+    timezone,
   };
 }
 
-// 항공편을 고정 타임라인 항목으로 시드 (좌표는 Phase 2 동선에서 채움)
+/** 항공편 → 타임라인 행 (addProject·patchProject·seed 공용). 항공편 수정 시 자동 갱신됨. */
+export function flightTimelineItem(
+  leg: 'outbound' | 'inbound',
+  f: { flightNo?: string; carrier?: string; depAirport?: string; depTime?: string; arrAirport?: string; arrTime?: string },
+): Omit<TimelineItem, 'id' | 'projectId' | 'day' | 'order'> {
+  const dir = leg === 'outbound' ? '출국' : '귀국';
+  const dep = f.depAirport || '출발';
+  const arr = f.arrAirport || '도착';
+  const name = f.carrier || f.flightNo || '';
+  return {
+    startTime: f.depTime || '00:00',
+    durationMin: 120,
+    place: `${dep} → ${arr} ${dir}${name ? ` (${name})` : ''}`,
+    lat: null,
+    lng: null,
+    memo: f.depTime || f.arrTime ? `${dep} (${f.depTime || '-'}) → ${arr} (${f.arrTime || '-'})` : '',
+    flightLeg: leg,
+  };
+}
+
+// 예시 타임라인 — 가상의 항공편 + 대표 명소 몇 곳 (개인정보 아님)
 export const SEED_TIMELINE: Omit<TimelineItem, 'id' | 'projectId'>[] = [
-  { day: 1, order: 0, startTime: '11:05', durationMin: 150, place: 'ICN → HAN 출국 (비엣젯항공 VJ961)', lat: null, lng: null, memo: 'ICN (11:05) → HAN (13:35)' },
-  { day: 3, order: 0, startTime: '16:20', durationMin: 145, place: 'HAN → ICN 귀국 (썬 푸꾸옥 9G410)', lat: null, lng: null, memo: 'HAN (16:20) → ICN (22:45)' },
+  { day: 1, order: 0, startTime: '09:30', durationMin: 190, place: 'ICN → HAN 출국 (KE457)', lat: null, lng: null, memo: 'ICN (09:30) → HAN (12:40)', flightLeg: 'outbound' },
+  { day: 1, order: 1, startTime: '15:00', durationMin: 60, place: '호안끼엠 호수 & 응옥썬 사당', lat: null, lng: null, memo: '붉은 테훅교에서 사진' },
+  { day: 1, order: 2, startTime: '18:30', durationMin: 90, place: '타히엔 맥주거리', lat: null, lng: null, memo: '저녁 겸 야시장 구경' },
+  { day: 2, order: 0, startTime: '10:00', durationMin: 90, place: '바딘 광장 & 호치민 묘소', lat: null, lng: null, memo: '' },
+  { day: 2, order: 1, startTime: '14:00', durationMin: 120, place: '서호 · 진국사', lat: null, lng: null, memo: '노을 시간대 추천' },
+  { day: 3, order: 0, startTime: '10:00', durationMin: 90, place: '동쑤언 시장 · 기념품', lat: null, lng: null, memo: '' },
+  { day: 3, order: 1, startTime: '14:10', durationMin: 385, place: 'HAN → ICN 귀국 (KE458)', lat: null, lng: null, memo: 'HAN (14:10) → ICN (20:35)', flightLeg: 'inbound' },
 ];
+
+/** 예시 할 일 */
+export const SEED_TODOS: Omit<Todo, 'id' | 'projectId'>[] = [
+  { text: '여권 유효기간 6개월 이상 확인', done: true, priority: 'high', order: 1 },
+  { text: '유심/이심 준비', done: false, priority: 'mid', order: 2 },
+  { text: '그랩(Grab) 앱 설치 · 결제카드 등록', done: false, priority: 'mid', order: 3 },
+  { text: '더위·비 대비 (우산, 얇은 겉옷)', done: false, priority: 'low', order: 4 },
+];
+
+/** 예시 지출 (가상 금액). dayOffset = 여행 n일차(0-base) */
+export const SEED_EXPENSES: (Omit<Expense, 'id' | 'projectId' | 'date'> & { dayOffset: number })[] = [
+  { dayOffset: 0, category: '식사', vendor: '쌀국수 점심', amountVnd: '180000', amountKrw: '9800' },
+  { dayOffset: 0, category: '기타', categoryEtc: '교통', vendor: '공항 → 시내 그랩', amountVnd: '350000', amountKrw: '19000' },
+  { dayOffset: 2, category: '쇼핑', vendor: '기념품 (커피·견과)', amountVnd: '600000', amountKrw: '32500' },
+];
+
+/** 예시 한 줄 일기. dayOffset = 여행 n일차(0-base) */
+export const SEED_DIARY: (Omit<DiaryEntry, 'id' | 'projectId' | 'date' | 'createdAt'> & { dayOffset: number })[] = [
+  { dayOffset: 0, author: '예시', text: '호안끼엠 호수 야경이 생각보다 훨씬 예뻤다', mood: '😍' },
+];
+
+/** 예시 여행 시작일 기준 n일차 날짜 (YYYY-MM-DD). 시간대 영향 없도록 정오 기준. */
+export function sampleDayIso(start: string, dayOffset: number): string {
+  const d = new Date(start + 'T12:00:00');
+  d.setDate(d.getDate() + dayOffset);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
