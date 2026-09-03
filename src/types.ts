@@ -160,6 +160,19 @@ export interface ChatMessage {
   sentAt: number;
 }
 
+/** 한 줄 일기 — 일정 탭에서 작성, MY 탭 [일기]에서 모아보기 */
+export interface DiaryEntry {
+  id: string;
+  projectId: string;
+  /** YYYY-MM-DD */
+  date: string;
+  author: string;
+  text: string;
+  /** 기분 이모지 (선택) */
+  mood?: string;
+  createdAt: number;
+}
+
 /** MY 탭 > 설정 + 앱 전역 설정 */
 export interface AppSettings {
   /** 접근 PIN (기본 250914) */
@@ -181,4 +194,6 @@ export interface TripDoc {
   messages: ChatMessage[];
   /** 채팅 참여자 프로필 스냅샷 (name → Person). 발신·프로필수정 시 갱신 */
   people?: Record<string, Person>;
+  /** 한 줄 일기 */
+  diary?: DiaryEntry[];
 }

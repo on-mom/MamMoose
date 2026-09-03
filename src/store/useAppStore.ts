@@ -19,7 +19,7 @@ const clone = <T,>(v: T): T =>
   typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v));
 
 function emptyDoc(): TripDoc {
-  return { timeline: [], restaurants: [], hotels: [], spots: [], todos: [], expenses: [], messages: [] };
+  return { timeline: [], restaurants: [], hotels: [], spots: [], todos: [], expenses: [], messages: [], people: {}, diary: [] };
 }
 
 /** 시드 데이터를 활성 프로젝트에 귀속시켜 초기 문서 생성 */

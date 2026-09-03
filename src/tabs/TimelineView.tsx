@@ -15,6 +15,7 @@ import { uid } from '../lib/uid';
 import { computeFocus } from '../lib/timezone';
 import { coordsForArea } from '../lib/areaCoords';
 import Modal from '../components/Modal';
+import { DiaryQuickWrite } from './DiaryView';
 
 const COL = 'col-'; // droppable 접두사
 const dayKeys = (n: number) => Array.from({ length: n }, (_, i) => String(i + 1));
@@ -160,6 +161,8 @@ export default function TimelineView() {
           <Sparkles size={12} /> 추천 스팟
         </button>
       </div>
+
+      <DiaryQuickWrite />
 
       {picker && (
         <Modal onClose={() => setPicker(false)} title={<span className="text-sm font-semibold text-white">추천 스팟에서 담기</span>}>

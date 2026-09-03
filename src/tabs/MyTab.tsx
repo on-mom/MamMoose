@@ -12,8 +12,9 @@ import { Moose } from '../components/Moose';
 import Modal from '../components/Modal';
 import { outboundText, inboundText, carrierOf } from '../lib/flight';
 import { CITY_TZ } from '../lib/cities';
+import DiaryView from './DiaryView';
 
-type Sub = 'chat' | 'trips' | 'settings';
+type Sub = 'chat' | 'diary' | 'trips' | 'settings';
 const hhmm = (ts: number) =>
   new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
@@ -32,7 +33,7 @@ export default function MyTab() {
   return (
     <div className="edge flex h-full flex-col py-3">
       <div className="mb-3 flex gap-1 rounded-lg bg-moose-dusk p-1 text-xs">
-        {([['chat', '채팅'], ['trips', '여행 선택'], ['settings', '설정']] as const).map(([k, l]) => (
+        {([['chat', '채팅'], ['diary', '일기'], ['trips', '여행'], ['settings', '설정']] as const).map(([k, l]) => (
           <button
             key={k}
             onClick={() => setSub(k)}
@@ -49,6 +50,7 @@ export default function MyTab() {
         </div>
       )}
       {sub === 'chat' && <Chat />}
+      {sub === 'diary' && <DiaryView />}
       {sub === 'trips' && <Trips />}
       {sub === 'settings' && <Settings />}
     </div>
