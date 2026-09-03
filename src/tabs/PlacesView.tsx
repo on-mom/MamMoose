@@ -246,27 +246,35 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
               </div>
             </div>
             {!selMode && (
-              <>
+              <div className="flex shrink-0 items-center gap-3">
                 <button
                   onClick={(e) => { e.stopPropagation(); focusOnMap(p); }}
-                  className={`shrink-0 rounded-md p-1 ${p.id === focusId ? 'text-moose-heart' : 'text-slate-500 hover:text-moose-heart'}`}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                    p.id === focusId ? 'bg-moose-heart/15 text-moose-heart' : 'text-slate-400 hover:text-moose-heart'
+                  }`}
                   title="지도에서 위치 보기"
                 >
-                  <MapPin size={14} />
+                  <MapPin size={16} />
                 </button>
                 {p.mapUrl && (
-                  <a href={p.mapUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
-                    className="shrink-0 text-slate-500 hover:text-moose-heart" title="구글 지도로 열기"><ExternalLink size={13} /></a>
+                  <a
+                    href={p.mapUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-moose-heart"
+                    title="구글 지도로 열기"
+                  >
+                    <ExternalLink size={15} />
+                  </a>
                 )}
                 <button
                   onClick={(e) => { e.stopPropagation(); addOne(p); }}
-                  className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold ${
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg font-semibold ${
                     added.has(p.id) ? 'bg-emerald-500/20 text-emerald-300' : 'btn-heart'
                   }`}
+                  title="일정에 담기"
                 >
-                  {added.has(p.id) ? <Check size={13} /> : <Plus size={13} />}
+                  {added.has(p.id) ? <Check size={15} /> : <Plus size={15} />}
                 </button>
-              </>
+              </div>
             )}
           </div>
         ))}
