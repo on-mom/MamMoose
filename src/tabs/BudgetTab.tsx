@@ -196,21 +196,27 @@ export default function BudgetTab() {
 function AddForm({ projectId, rate }: { projectId: string; rate: number }) {
   const mutate = useAppStore((s) => s.mutate);
   const today = new Date().toISOString().slice(0, 10);
-  const [f, setF] = useState({ date: today, category: '식사' as ExpenseCategory, categoryEtc: '', vendor: '', amountVnd: '' });
+  const [f, setF] = useState({ date: today, category: '식사' as ExpenseCategory, categoryEtc: '', vendor: '', amount: '' });
+  const [cur, setCur] = useState<'VND' | 'KRW'>('VND');
+
+  // 입력 통화와 무관하게 저장은 VND 원금 + KRW 환산 둘 다
+  const n = Number(f.amount) || 0;
+  const vnd = cur === 'VND' ? n : Math.round(n / rate);
+  const krw = cur === 'VND' ? Number(toKrw(String(n), rate)) : n;
 
   const submit = () => {
-    if (!f.amountVnd || !f.vendor.trim()) return;
+    if (!f.amount || !f.vendor.trim()) return;
     mutate((doc) => {
       doc.expenses.push({
         id: uid(), projectId,
         date: f.date, category: f.category,
         categoryEtc: f.category === '기타' ? f.categoryEtc.trim() : undefined,
         vendor: f.vendor.trim(),
-        amountVnd: String(f.amountVnd),
-        amountKrw: toKrw(f.amountVnd, rate),
+        amountVnd: String(vnd),
+        amountKrw: String(krw),
       });
     });
-    setF({ ...f, vendor: '', amountVnd: '', categoryEtc: '' });
+    setF({ ...f, vendor: '', amount: '', categoryEtc: '' });
   };
 
   return (
@@ -230,11 +236,23 @@ function AddForm({ projectId, rate }: { projectId: string; rate: number }) {
       <input value={f.vendor} onChange={(e) => setF({ ...f, vendor: e.target.value })}
         placeholder="지출처" className="w-full rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
       <div className="flex items-center gap-2">
-        <input type="number" inputMode="numeric" value={f.amountVnd} onChange={(e) => setF({ ...f, amountVnd: e.target.value })}
-          placeholder="금액 (VND)" className="flex-1 rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
-        <span className="text-[11px] text-emerald-400">≈ {commas(toKrw(f.amountVnd || '0', rate))} 원</span>
+        <select
+          value={cur}
+          onChange={(e) => setCur(e.target.value as 'VND' | 'KRW')}
+          className="shrink-0 rounded bg-moose-edge px-2 py-1.5 font-semibold text-slate-100 outline-none"
+        >
+          <option value="VND">₫ 동</option>
+          <option value="KRW">₩ 원</option>
+        </select>
+        <input type="number" inputMode="numeric" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })}
+          placeholder={cur === 'VND' ? '금액 (VND)' : '금액 (원)'} className="flex-1 rounded bg-moose-edge px-2 py-1.5 text-right text-slate-100 outline-none" />
         <button onClick={submit} className="rounded btn-heart rounded-xl px-3 py-1.5 font-semibold"><Plus size={14} /></button>
       </div>
+      {f.amount && (
+        <div className="text-right text-[11px] text-emerald-400">
+          {cur === 'VND' ? `≈ ${commas(krw)} 원` : `≈ ${commas(vnd)} ₫`}
+        </div>
+      )}
     </div>
   );
 }

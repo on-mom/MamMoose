@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import TimelineView from './TimelineView';
 import MapView from './MapView';
-import PlacesView from './PlacesView';
 
-type Sub = 'timeline' | 'route' | 'places';
-const TABS: [Sub, string][] = [['timeline', '타임라인'], ['route', '동선'], ['places', '장소']];
+type Sub = 'timeline' | 'route';
+const TABS: [Sub, string][] = [['timeline', '타임라인'], ['route', '동선']];
 
 export default function ScheduleTab() {
   const [sub, setSub] = useState<Sub>('timeline');
@@ -23,9 +22,7 @@ export default function ScheduleTab() {
           ))}
         </div>
       </div>
-      {sub === 'timeline' && <TimelineView />}
-      {sub === 'route' && <MapView />}
-      {sub === 'places' && <PlacesView />}
+      {sub === 'timeline' ? <TimelineView /> : <MapView />}
     </div>
   );
 }

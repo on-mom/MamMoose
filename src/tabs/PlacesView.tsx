@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Plus, ExternalLink, Check, Search, Map as MapIcon, X, Utensils, Navigation } from 'lucide-react';
+import { Plus, ExternalLink, Check, Search, Map as MapIcon, X, Utensils, Navigation, PencilLine } from 'lucide-react';
 import type { EntryComment, TripDoc } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { useMyName } from '../lib/members';
 import { usePlaces, splitAreas, KIND_LABEL, type Place, type PlaceKind } from '../lib/places';
-import { coordsForArea } from '../lib/areaCoords';
+import { coordsForArea, AREA_COORDS } from '../lib/areaCoords';
 import { geocode } from '../lib/geocode';
 import { directionsUrl } from '../lib/maps';
 import {
@@ -27,8 +27,8 @@ const jitter = (id: string) => {
 const arrOf = (kind: PlaceKind): keyof TripDoc =>
   kind === 'landmark' ? 'spots' : kind === 'food' ? 'restaurants' : 'hotels';
 
-/** 일정 › 장소 — 검색 시트 + 결과 + 다중선택 담기 + 상세(댓글). */
-export default function PlacesView() {
+/** 장소 통합 뷰 — 검색 시트 + 결과 + 다중선택 담기 + 상세(댓글). 맛집 탭에 임베드. */
+export default function PlacesView({ embedded }: { embedded?: boolean }) {
   const project = useActiveProject()!;
   const places = usePlaces();
   const mutate = useAppStore((s) => s.mutate);
@@ -39,6 +39,7 @@ export default function PlacesView() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [day, setDay] = useState(1);
   const [selMode, setSelMode] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -103,7 +104,7 @@ export default function PlacesView() {
   );
 
   return (
-    <div className="edge space-y-2.5 py-3">
+    <div className={embedded ? 'space-y-2.5' : 'edge space-y-2.5 py-3'}>
       {/* 검색 바 */}
       <button
         onClick={() => setSheetOpen(true)}
@@ -128,6 +129,9 @@ export default function PlacesView() {
           ))}
         </div>
         <div className="flex shrink-0 items-center gap-2 pl-2">
+          <button onClick={() => setAdding(true)} className="flex items-center gap-0.5 text-slate-400">
+            <PencilLine size={13} /> 직접 추가
+          </button>
           <button onClick={() => setShowMap((v) => !v)} className={`flex items-center gap-0.5 ${showMap ? 'text-moose-heart' : 'text-slate-400'}`}>
             <MapIcon size={13} /> 지도
           </button>
@@ -139,6 +143,8 @@ export default function PlacesView() {
           </button>
         </div>
       </div>
+
+      {adding && <AddPlaceForm projectId={project.id} onDone={() => setAdding(false)} />}
 
       {showMap && (
         <PlaceMap
@@ -296,6 +302,55 @@ export default function PlacesView() {
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+/* ---------- 장소 직접 추가 (맛집으로 등록) ---------- */
+function AddPlaceForm({ projectId, onDone }: { projectId: string; onDone: () => void }) {
+  const mutate = useAppStore((s) => s.mutate);
+  const [f, setF] = useState({ nameKo: '', name: '', category: '', area: '', mapUrl: '', priceVndText: '', menu: '', note: '' });
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  const areas = Object.keys(AREA_COORDS);
+
+  const submit = () => {
+    const display = f.nameKo.trim() || f.name.trim();
+    if (!display) return;
+    mutate((doc) => {
+      doc.restaurants.unshift({
+        id: uid(), projectId,
+        name: f.name.trim() || display,
+        nameKo: f.nameKo.trim() || undefined,
+        category: f.category.trim() || '기타',
+        area: f.area.trim(),
+        mapUrl: f.mapUrl.trim() || `https://maps.google.com/?q=${encodeURIComponent((f.name || display) + ' Hanoi')}`,
+        priceVndText: f.priceVndText.trim(), priceKrwText: '',
+        priceVndAvg: Number((f.priceVndText.match(/[\d,]+/)?.[0] ?? '').replace(/,/g, '')) || 0,
+        menu: f.menu.trim() || undefined,
+        note: f.note.trim(), custom: true,
+      });
+    });
+    onDone();
+  };
+
+  const inp = 'w-full rounded-lg bg-white/5 px-2.5 py-2 text-slate-100 outline-none ring-1 ring-white/5 placeholder:text-slate-600';
+  return (
+    <div className="card space-y-2 p-3 text-xs">
+      <input value={f.nameKo} onChange={set('nameKo')} placeholder="장소명 (한국어 표기) *" className={inp} />
+      <input value={f.name} onChange={set('name')} placeholder="원어명 (구글맵 검색용)" className={inp} />
+      <div className="grid grid-cols-2 gap-2">
+        <input value={f.category} onChange={set('category')} placeholder="카테고리" className={inp} />
+        <input value={f.area} onChange={set('area')} list="area-list" placeholder="구역" className={inp} />
+        <datalist id="area-list">{areas.map((a) => <option key={a} value={a} />)}</datalist>
+      </div>
+      <input value={f.priceVndText} onChange={set('priceVndText')} placeholder="2인 평균 (예: 180,000~240,000 VND)" className={inp} />
+      <input value={f.menu} onChange={set('menu')} placeholder="추천 메뉴" className={inp} />
+      <input value={f.mapUrl} onChange={set('mapUrl')} placeholder="구글 지도 링크 (비우면 자동)" className={inp} />
+      <input value={f.note} onChange={set('note')} placeholder="특징 / 한줄 소개" className={inp} />
+      <div className="flex justify-end gap-2 pt-1">
+        <button onClick={onDone} className="px-3 py-1 text-slate-400">취소</button>
+        <button onClick={submit} className="btn-heart rounded-lg px-4 py-1.5 font-semibold">등록</button>
+      </div>
     </div>
   );
 }

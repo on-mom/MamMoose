@@ -193,10 +193,19 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'mammoose-store',
-      version: 4,
+      version: 6,
       migrate: (persisted: any, from) => {
         if (from < 2 && persisted?.settings?.fixedVndToKrw === '0.0546') {
           persisted.settings.fixedVndToKrw = DEFAULT_VND_KRW;
+        }
+        if (from < 6) {
+          // 채팅 배경(bg)은 더 이상 동기화 안 함 — 용량 큰 사진이 doc/localStorage quota 초과시킴.
+          // 기존에 저장된 people[*].bg 제거.
+          for (const doc of Object.values(persisted?.present ?? {}) as any[]) {
+            for (const p of Object.values(doc?.people ?? {}) as any[]) {
+              if (p && 'bg' in p) delete p.bg;
+            }
+          }
         }
         if (from < 4) {
           // 시드 여행에 구조화된 항공편 주입 (자유 텍스트 → 구조화)

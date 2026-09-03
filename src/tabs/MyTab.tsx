@@ -16,19 +16,11 @@ import DiaryView from './DiaryView';
 import ToolsView from './ToolsView';
 import MemoriesView, { useMemoryPicks, tripEnded } from './MemoriesView';
 import { ensureNotifyPermission, fireLocalNotification, alreadyNotified, markNotified, canNotify } from '../lib/notify';
+import { compressImage } from '../lib/image';
 
 type Sub = 'chat' | 'diary' | 'memories' | 'tools' | 'trips' | 'settings';
 const hhmm = (ts: number) =>
   new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
-
-const readImage = (file: File): Promise<string> =>
-  new Promise((res, rej) => {
-    if (file.size > 3 * 1024 * 1024) return rej(new Error('3MB 이하 이미지만 가능'));
-    const r = new FileReader();
-    r.onload = () => res(String(r.result));
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
 
 export default function MyTab() {
   const [sub, setSub] = useState<Sub>('chat');
@@ -106,14 +98,14 @@ function Chat() {
   const myName = cloudUser?.name || profile.displayName || '나';
   const myAvatar = cloudUser?.avatar || profile.avatarDataUrl;
 
-  /** 내 프로필 스냅샷을 채팅방(TripDoc)에 반영 — 동행자에게도 동기화됨 */
+  /** 내 프로필 스냅샷을 채팅방(TripDoc)에 반영 — 동행자에게도 동기화됨.
+   *  배경(bg)은 개인 취향 + 용량 커서 동기화 안 함(각자 자기 채팅 배경). */
   const syncMe = (over: Partial<Person> = {}) =>
     mutate((doc) => {
       doc.people = doc.people ?? {};
       doc.people[myName] = {
         name: myName,
         avatar: myAvatar ?? null,
-        bg: profile.chatBgDataUrl ?? null,
         statusMessage: profile.statusMessage ?? '',
         ...over,
       };
@@ -121,12 +113,16 @@ function Chat() {
 
   const pickImage = (which: 'avatarDataUrl' | 'chatBgDataUrl') => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     try {
-      const url = await readImage(file);
+      // 아바타는 작게(256), 배경은 화면폭(1200). 원본 저장 시 localStorage quota 초과.
+      const url = which === 'avatarDataUrl'
+        ? await compressImage(file, 256, 0.82)
+        : await compressImage(file, 1200, 0.68);
       setProfile({ [which]: url });
       setErr('');
-      syncMe(which === 'avatarDataUrl' ? { avatar: url } : { bg: url });
+      if (which === 'avatarDataUrl') syncMe({ avatar: url });
     } catch (x) { setErr((x as Error).message); }
   };
 
@@ -180,9 +176,15 @@ function Chat() {
             placeholder="프로필명"
             className="flex-1 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-600"
           />
-          <button onClick={() => bgInput.current?.click()} className="flex items-center gap-1 text-[11px] text-slate-400">
-            <ImageIcon size={13} /> 배경
-          </button>
+          {profile.chatBgDataUrl ? (
+            <button onClick={() => setProfile({ chatBgDataUrl: null })} className="flex items-center gap-1 text-[11px] text-slate-400">
+              <ImageIcon size={13} /> 배경 지우기
+            </button>
+          ) : (
+            <button onClick={() => bgInput.current?.click()} className="flex items-center gap-1 text-[11px] text-slate-400">
+              <ImageIcon size={13} /> 배경
+            </button>
+          )}
         </div>
         <input
           value={profile.statusMessage ?? ''}

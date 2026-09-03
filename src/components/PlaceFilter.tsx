@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { ArrowUpDown } from 'lucide-react';
-import { KIND_LABEL, splitAreas, type Place, type PlaceKind } from '../lib/places';
+import { KIND_LABEL, type Place, type PlaceKind } from '../lib/places';
+import { ZONES, zonesOf, type ZoneId } from '../lib/zones';
 
 const KINDS: PlaceKind[] = ['landmark', 'food', 'stay'];
 export type PlaceSort = 'default' | 'name' | 'price';
@@ -9,35 +10,41 @@ const SORTS: [PlaceSort, string][] = [['default', '기본순'], ['name', '이름
 export interface PlaceFilterState {
   /** 상단에 오는 축 */
   primary: 'area' | 'kind';
-  areaSel: string[];
+  /** 선택된 존 id들 (빈 배열 = 전체) */
+  zoneSel: string[];
   kind: PlaceKind;
   cat: string;
   sort: PlaceSort;
 }
 export const emptyFilterState: PlaceFilterState = {
-  primary: 'area', areaSel: [], kind: 'food', cat: '전체', sort: 'default',
+  primary: 'area', zoneSel: [], kind: 'food', cat: '전체', sort: 'default',
 };
+
+const inZones = (area: string, sel: string[]) =>
+  !sel.length || zonesOf(area).some((z) => sel.includes(z));
 
 export function applyPlaceFilter(places: Place[], f: PlaceFilterState): Place[] {
   let r = places.filter((p) => p.kind === f.kind);
-  if (f.areaSel.length) r = r.filter((p) => splitAreas(p.area).some((a) => f.areaSel.includes(a)));
+  r = r.filter((p) => inZones(p.area, f.zoneSel));
   if (f.cat !== '전체') r = r.filter((p) => p.category === f.cat);
   if (f.sort === 'name') r = [...r].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   if (f.sort === 'price') r = [...r].sort((a, b) => (a.priceValue ?? Infinity) - (b.priceValue ?? Infinity));
   return r;
 }
 
-/** 선택된 필터를 사람이 읽는 짧은 요약 (검색 버튼 옆 칩) */
+/** 선택된 필터를 사람이 읽는 짧은 요약 (검색 버튼 옆) */
 export function filterSummary(f: PlaceFilterState): string {
   const parts = [KIND_LABEL[f.kind].split('·')[0]];
-  if (f.areaSel.length) parts.push(f.areaSel.slice(0, 2).join('·') + (f.areaSel.length > 2 ? '…' : ''));
+  if (f.zoneSel.length) {
+    const names = f.zoneSel.map((id) => ZONES.find((z) => z.id === id)?.label.split('·')[0] ?? id);
+    parts.push(names.slice(0, 2).join('·') + (names.length > 2 ? '…' : ''));
+  }
   if (f.cat !== '전체') parts.push(f.cat);
   return parts.join(' / ');
 }
 
 /**
- * 1차 지역(다중) · 2차 종류(3버튼) · 3차 세부+정렬. 상태는 부모가 소유(controlled).
- * 일정 › 장소 검색 시트 · '추천 스팟 담기' 모달 공용.
+ * 1차 지역(넓은 존 6개, 복수) · 2차 종류(3버튼) · 3차 세부+정렬. 상태는 부모 소유(controlled).
  */
 export function PlaceFilterControls({
   places, state, onChange,
@@ -48,51 +55,53 @@ export function PlaceFilterControls({
 }) {
   const set = (patch: Partial<PlaceFilterState>) => onChange({ ...state, ...patch });
   const byKind = (list: Place[]) => list.filter((p) => p.kind === state.kind);
-  const byArea = (list: Place[]) =>
-    state.areaSel.length ? list.filter((p) => splitAreas(p.area).some((a) => state.areaSel.includes(a))) : list;
+  const byZone = (list: Place[]) => list.filter((p) => inZones(p.area, state.zoneSel));
 
-  const areaOptions = useMemo(() => {
+  const zoneCounts = useMemo(() => {
     const src = state.primary === 'kind' ? byKind(places) : places;
-    const s = new Set<string>();
-    for (const p of src) splitAreas(p.area).forEach((a) => s.add(a));
-    return [...s].sort((a, b) => a.localeCompare(b, 'ko'));
+    const c: Record<string, number> = {};
+    for (const p of src) for (const z of zonesOf(p.area)) c[z] = (c[z] ?? 0) + 1;
+    return c;
   }, [places, state.primary, state.kind]);
 
   const kindCounts = useMemo(() => {
-    const src = state.primary === 'area' ? byArea(places) : places;
+    const src = state.primary === 'area' ? byZone(places) : places;
     const c: Record<string, number> = {};
     for (const p of src) c[p.kind] = (c[p.kind] ?? 0) + 1;
     return c;
-  }, [places, state.primary, state.areaSel]);
+  }, [places, state.primary, state.zoneSel]);
 
   const catOptions = useMemo(() => {
-    const base = byKind(state.primary === 'area' ? byArea(places) : places);
+    const base = byKind(state.primary === 'area' ? byZone(places) : places);
     return ['전체', ...[...new Set(base.map((p) => p.category))].sort((a, b) => a.localeCompare(b, 'ko'))];
-  }, [places, state.primary, state.areaSel, state.kind]);
+  }, [places, state.primary, state.zoneSel, state.kind]);
 
-  const toggleArea = (a: string) =>
-    set({ areaSel: state.areaSel.includes(a) ? state.areaSel.filter((x) => x !== a) : [...state.areaSel, a] });
+  const toggleZone = (id: ZoneId) =>
+    set({ zoneSel: state.zoneSel.includes(id) ? state.zoneSel.filter((x) => x !== id) : [...state.zoneSel, id] });
 
-  const AreaRow = (
-    <div key="area">
+  const ZoneRow = (
+    <div key="zone">
       <div className="mb-1.5 flex items-center gap-1.5">
         <span className="text-[11px] font-semibold text-slate-400">1차 · 지역 (복수)</span>
-        {state.areaSel.length > 0 && (
-          <button onClick={() => set({ areaSel: [] })} className="rounded-full bg-white/5 px-1.5 text-[10px] text-slate-400">지역 전체</button>
+        {state.zoneSel.length > 0 && (
+          <button onClick={() => set({ zoneSel: [] })} className="rounded-full bg-white/5 px-1.5 text-[10px] text-slate-400">전체</button>
         )}
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {areaOptions.map((a) => {
-          const on = state.areaSel.includes(a);
+      <div className="grid grid-cols-3 gap-1.5">
+        {ZONES.map((z) => {
+          const on = state.zoneSel.includes(z.id);
+          const cnt = zoneCounts[z.id] ?? 0;
           return (
             <button
-              key={a}
-              onClick={() => toggleArea(a)}
-              className={`rounded-full px-3 py-1.5 text-xs transition ${
-                on ? 'bg-moose-heart/25 text-moose-heart ring-1 ring-moose-heart/40' : 'bg-white/5 text-slate-400'
+              key={z.id}
+              onClick={() => toggleZone(z.id)}
+              className={`flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2 text-center transition ${
+                on ? 'border-moose-heart bg-moose-heart/15' : 'border-white/5 bg-white/[0.03]'
               }`}
             >
-              {a}
+              <span className="text-lg leading-none">{z.emoji}</span>
+              <span className={`text-[10px] font-medium leading-tight ${on ? 'text-moose-heart' : 'text-slate-300'}`}>{z.label}</span>
+              <span className="text-[9px] text-slate-500">{cnt}곳</span>
             </button>
           );
         })}
@@ -138,7 +147,7 @@ export function PlaceFilterControls({
         </select>
       </div>
 
-      {state.primary === 'area' ? [AreaRow, KindRow] : [KindRow, AreaRow]}
+      {state.primary === 'area' ? [ZoneRow, KindRow] : [KindRow, ZoneRow]}
 
       {catOptions.length > 1 && (
         <div>

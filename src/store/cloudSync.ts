@@ -23,6 +23,16 @@ let unsubStore: (() => void) | null = null;
 let currentUid: string | null = null;
 
 const isCloudId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-/.test(id);
+
+/** 클라우드에 저장하지 않는 것 정리: 채팅 배경(용량 큰 사진 → quota 초과) */
+function sanitizeDoc(doc: TripDoc): TripDoc {
+  if (doc?.people) {
+    for (const p of Object.values(doc.people)) {
+      if (p && 'bg' in p) delete (p as { bg?: unknown }).bg;
+    }
+  }
+  return doc;
+}
 const stripId = (p: Project): Omit<Project, 'id'> => {
   const rest: Record<string, unknown> = { ...p };
   delete rest.id;
@@ -47,7 +57,7 @@ async function fetchTrips() {
   err(null);
   const projects: Project[] = rows.map((r) => ({ ...r.meta, id: r.id }));
   const docs: Record<string, TripDoc> = {};
-  for (const r of rows) docs[r.id] = r.doc;
+  for (const r of rows) docs[r.id] = sanitizeDoc(r.doc);
   applyingRemote = true;
   useAppStore.getState().hydrateCloud(projects, docs);
   applyingRemote = false;
@@ -96,7 +106,7 @@ async function pushTrip(id: string) {
   if (!proj || !doc || !user) return;
   const { error } = await supabase
     .from('trips')
-    .update({ doc, meta: stripId(proj), updated_at: new Date().toISOString(), updated_by: user.id })
+    .update({ doc: sanitizeDoc(doc), meta: stripId(proj), updated_at: new Date().toISOString(), updated_by: user.id })
     .eq('id', id);
   if (error) err('동기화 실패: ' + error.message);
   else err(null);
