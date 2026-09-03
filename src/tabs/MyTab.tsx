@@ -97,16 +97,20 @@ function Chat() {
   const avatarInput = useRef<HTMLInputElement>(null);
   const bgInput = useRef<HTMLInputElement>(null);
 
-  const myName = cloudUser?.name || profile.displayName || '나';
+  // 앱에서 바꾼 프로필명이 우선 (카톡/구글 기본 닉네임보다)
+  const myName = (profile.displayName || '').trim() || cloudUser?.name || '나';
   const myAvatar = cloudUser?.avatar || profile.avatarDataUrl;
 
   const [uploading, setUploading] = useState(false);
 
   /** 내 프로필 스냅샷을 채팅방(TripDoc)에 반영 — 동행자에게도 동기화됨.
-   *  로그인 시 아바타·배경은 Storage URL(작음) 이라 배경도 함께 동기화. */
+   *  이름을 바꿨으면 이전 이름(카톡 기본 등)으로 저장된 스냅샷은 정리. */
   const syncMe = (over: Partial<Person> = {}) =>
     mutate((doc) => {
       doc.people = doc.people ?? {};
+      for (const stale of [cloudUser?.name, profile.displayName].filter(Boolean) as string[]) {
+        if (stale !== myName && doc.people[stale]) delete doc.people[stale];
+      }
       doc.people[myName] = {
         name: myName,
         avatar: myAvatar ?? null,
@@ -260,24 +264,24 @@ function Chat() {
       {viewPerson && (
         <Modal onClose={() => setViewPerson(null)}>
           <div className="-mx-5 -my-4">
-            {/* 카톡식 — 배경 크게, 아바타가 하단에 걸침 */}
+            {/* 카톡식 — 세로형 배경, 아바타가 하단에 걸침 */}
             <div
-              className="relative h-56 bg-cover bg-center"
+              className="relative aspect-[4/5] w-full bg-cover bg-center"
               style={{
                 backgroundImage: viewPerson.bg
-                  ? `linear-gradient(to bottom, transparent 55%, rgba(0,0,0,.55)), url(${viewPerson.bg})`
+                  ? `linear-gradient(to bottom, transparent 45%, rgba(0,0,0,.6)), url(${viewPerson.bg})`
                   : 'linear-gradient(160deg,#3a2733,#221b2c)',
               }}
             >
-              <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 px-5 pb-4">
-                <div className="h-20 w-20 overflow-hidden rounded-full border-2 border-white/80 bg-moose-edge shadow-lg">
+              <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1.5 px-5 pb-6">
+                <div className="h-24 w-24 overflow-hidden rounded-full border-[3px] border-white/85 bg-moose-edge shadow-xl">
                   {viewPerson.avatar
                     ? <img src={viewPerson.avatar} alt="" className="h-full w-full object-cover" />
                     : <Moose variant="face" className="h-full w-full object-cover" alt="" />}
                 </div>
-                <div className="text-lg font-bold text-white drop-shadow">{viewPerson.name}</div>
+                <div className="text-xl font-bold text-white drop-shadow">{viewPerson.name}</div>
                 {viewPerson.statusMessage && (
-                  <div className="text-center text-[13px] text-white/80 drop-shadow">{viewPerson.statusMessage}</div>
+                  <div className="text-center text-[13px] text-white/85 drop-shadow">{viewPerson.statusMessage}</div>
                 )}
               </div>
             </div>

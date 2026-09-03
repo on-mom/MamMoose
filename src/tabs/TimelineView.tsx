@@ -190,8 +190,6 @@ export default function TimelineView() {
         </button>
       </div>
 
-      <DiaryQuickWrite />
-
       <div className="flex items-center justify-between rounded-lg bg-moose-dusk/50 px-2 py-1.5">
         <div className="flex gap-1 text-[11px]">
           <button
@@ -301,6 +299,9 @@ export default function TimelineView() {
           </DragOverlay>
         </DndContext>
       )}
+
+      {/* 오늘 한 줄 — 저녁(20시 이후) 화면 맨 아래에 */}
+      {new Date().getHours() >= 20 && <DiaryQuickWrite />}
 
       {detailId && byId[detailId] && (
         <ItemDetailModal item={byId[detailId]} onClose={() => setDetailId(null)} />

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Users } from 'lucide-react';
 import type { Todo, TodoPriority } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
@@ -23,6 +23,7 @@ export default function TodoTab() {
   const [text, setText] = useState('');
   const [groupByPrio, setGroupByPrio] = useState(false);
   const [who, setWho] = useState<string>('전체');
+  const [assignMenu, setAssignMenu] = useState<string | null>(null);
 
   const add = () => {
     if (!text.trim()) return;
@@ -36,17 +37,24 @@ export default function TodoTab() {
   };
   const patch = (id: string, p: Partial<Todo>) =>
     mutate((doc) => { const t = doc.todos.find((x) => x.id === id); if (t) Object.assign(t, p); });
+  const toggleAssignee = (id: string, name: string) =>
+    mutate((doc) => {
+      const t = doc.todos.find((x) => x.id === id);
+      if (!t) return;
+      const cur = new Set(t.assignees ?? []);
+      cur.has(name) ? cur.delete(name) : cur.add(name);
+      t.assignees = cur.size ? [...cur] : undefined;
+    });
   const remove = (id: string) =>
     mutate((doc) => { doc.todos = doc.todos.filter((x) => x.id !== id); });
 
-  // 담당자 필터 칩: 참여자 + 실제 배정된 담당자 + 미지정
-  const assignees = Array.from(
-    new Set([...members, ...todos.map((t) => t.assignee).filter(Boolean) as string[]]),
-  );
-  const hasUnassigned = todos.some((t) => !t.assignee);
+  // 필터 칩: 참여자 + 실제 배정된 담당자 + 미지정
+  const assigned = todos.flatMap((t) => t.assignees ?? []);
+  const chips = Array.from(new Set([...members, ...assigned]));
+  const hasUnassigned = todos.some((t) => !t.assignees?.length);
 
   const visible = todos.filter((t) =>
-    who === '전체' ? true : who === UNASSIGNED ? !t.assignee : t.assignee === who,
+    who === '전체' ? true : who === UNASSIGNED ? !t.assignees?.length : t.assignees?.includes(who),
   );
   const sorted = [...visible].sort((a, b) =>
     Number(a.done) - Number(b.done) ||
@@ -56,7 +64,7 @@ export default function TodoTab() {
   const doneCount = todos.filter((t) => t.done).length;
 
   return (
-    <div className="edge space-y-3 py-3">
+    <div className="edge space-y-3 py-3" onClick={() => setAssignMenu(null)}>
       <div className="flex items-baseline justify-between">
         <h2 className="font-title text-xl font-bold text-white">Todo</h2>
         <span className="text-xs text-slate-500">{doneCount}/{todos.length} 완료</span>
@@ -78,9 +86,9 @@ export default function TodoTab() {
           <input type="checkbox" checked={groupByPrio} onChange={(e) => setGroupByPrio(e.target.checked)} />
           우선순위순
         </label>
-        {(assignees.length > 0 || hasUnassigned) && (
+        {(chips.length > 0 || hasUnassigned) && (
           <div className="no-scrollbar flex flex-1 gap-1.5 overflow-x-auto">
-            {['전체', ...assignees, ...(hasUnassigned ? [UNASSIGNED] : [])].map((a) => (
+            {['전체', ...chips, ...(hasUnassigned ? [UNASSIGNED] : [])].map((a) => (
               <button
                 key={a}
                 onClick={() => setWho(a)}
@@ -96,49 +104,70 @@ export default function TodoTab() {
       </div>
 
       <ul className="space-y-1">
-        {sorted.map((t) => (
-          <li
-            key={t.id}
-            className="group flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-2 hover:bg-moose-dusk/60"
-          >
-            <GripVertical size={14} className="shrink-0 text-moose-edge" />
-            <input
-              type="checkbox"
-              checked={t.done}
-              onChange={(e) => patch(t.id, { done: e.target.checked })}
-              className="h-4 w-4 shrink-0 accent-moose-heart"
-            />
-            <input
-              key={t.text}
-              defaultValue={t.text}
-              onBlur={(e) => e.target.value.trim() && e.target.value !== t.text && patch(t.id, { text: e.target.value.trim() })}
-              className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
-                t.done ? 'text-slate-600 line-through' : 'text-slate-100'
-              }`}
-            />
-            <select
-              value={t.priority}
-              onChange={(e) => patch(t.id, { priority: e.target.value as TodoPriority })}
-              className={`shrink-0 rounded-full border-0 px-2 py-0.5 text-[10px] outline-none ${PRIO[t.priority].cls}`}
-            >
-              {PRIOS.map((p) => <option key={p} value={p} className="bg-moose-edge text-slate-100">{PRIO[p].label}</option>)}
-            </select>
-            <select
-              value={t.assignee ?? ''}
-              onChange={(e) => patch(t.id, { assignee: e.target.value || undefined })}
-              className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-slate-300 outline-none"
-            >
-              <option value="" className="bg-moose-edge">담당 미지정</option>
-              {members.map((m) => <option key={m} value={m} className="bg-moose-edge">{m}</option>)}
-              {t.assignee && !members.includes(t.assignee) && (
-                <option value={t.assignee} className="bg-moose-edge">{t.assignee}</option>
-              )}
-            </select>
-            <button onClick={() => remove(t.id)} className="shrink-0 text-slate-700 hover:text-rose-400">
-              <Trash2 size={13} />
-            </button>
-          </li>
-        ))}
+        {sorted.map((t) => {
+          const who2 = t.assignees ?? [];
+          return (
+            <li key={t.id} className="group rounded-lg px-2 py-2 hover:bg-moose-dusk/60">
+              <div className="flex items-center gap-2">
+                <GripVertical size={14} className="shrink-0 text-moose-edge" />
+                <input
+                  type="checkbox"
+                  checked={t.done}
+                  onChange={(e) => patch(t.id, { done: e.target.checked })}
+                  className="h-4 w-4 shrink-0 accent-moose-heart"
+                />
+                <input
+                  key={t.text}
+                  defaultValue={t.text}
+                  onBlur={(e) => e.target.value.trim() && e.target.value !== t.text && patch(t.id, { text: e.target.value.trim() })}
+                  className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
+                    t.done ? 'text-slate-600 line-through' : 'text-slate-100'
+                  }`}
+                />
+                <select
+                  value={t.priority}
+                  onChange={(e) => patch(t.id, { priority: e.target.value as TodoPriority })}
+                  className={`shrink-0 rounded-full border-0 px-2 py-0.5 text-[10px] outline-none ${PRIO[t.priority].cls}`}
+                >
+                  {PRIOS.map((p) => <option key={p} value={p} className="bg-moose-edge text-slate-100">{PRIO[p].label}</option>)}
+                </select>
+                <button onClick={() => remove(t.id)} className="shrink-0 text-slate-700 hover:text-rose-400">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+
+              {/* 담당자 (복수) */}
+              <div className="relative mt-1 pl-8">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setAssignMenu(assignMenu === t.id ? null : t.id); }}
+                  className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-slate-300"
+                >
+                  <Users size={11} />
+                  {who2.length ? who2.join(' · ') : '담당 지정'}
+                </button>
+                {assignMenu === t.id && (
+                  <div
+                    className="modal-surface absolute left-8 z-30 mt-1 w-40 space-y-0.5 rounded-xl p-2 text-xs"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {members.length === 0 && <div className="px-1 py-1 text-[11px] text-slate-500">참여자가 없어요</div>}
+                    {members.map((m) => (
+                      <label key={m} className="flex items-center gap-2 rounded-lg px-1 py-1 text-slate-200 hover:bg-white/5">
+                        <input
+                          type="checkbox"
+                          className="accent-moose-heart"
+                          checked={who2.includes(m)}
+                          onChange={() => toggleAssignee(t.id, m)}
+                        />
+                        {m}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
         {todos.length === 0 && (
           <li><MooseEmpty line="가볼 만한 곳, 챙길 것들을 적어보세요" sub="맘무가 하나하나 챙겨드릴게요" /></li>
         )}

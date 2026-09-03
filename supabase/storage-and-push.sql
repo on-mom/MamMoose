@@ -5,11 +5,13 @@
 --  (재실행해도 안전)
 -- ============================================================
 
--- ---------- 1. trip-photos 버킷 정책 ----------
--- 버킷은 대시보드 Storage 에서 미리 만들어 두세요:
---   이름 trip-photos, Public bucket 체크
--- 읽기(SELECT)는 Public 버킷이라 자동 허용. 업로드/삭제만 정책 추가.
+-- ---------- 1. trip-photos 버킷 + 정책 ----------
+-- 버킷을 SQL 로 생성(대시보드에서 안 만들어졌거나 "Bucket not found" 뜰 때).
+insert into storage.buckets (id, name, public)
+values ('trip-photos', 'trip-photos', true)
+on conflict (id) do update set public = true;
 
+-- 읽기(SELECT)는 Public 버킷이라 자동 허용. 업로드/삭제만 정책 추가.
 drop policy if exists "trip-photos insert" on storage.objects;
 create policy "trip-photos insert"
   on storage.objects for insert to authenticated

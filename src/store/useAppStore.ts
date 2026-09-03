@@ -219,9 +219,18 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'mammoose-store',
-      version: 7,
+      version: 8,
       storage: createJSONStorage(() => safeStorage),
       migrate: (persisted: any, from) => {
+        if (from < 8) {
+          // Todo 담당자 단일 → 배열
+          for (const doc of Object.values(persisted?.present ?? {}) as any[]) {
+            for (const t of doc?.todos ?? []) {
+              if (t.assignee && !t.assignees) t.assignees = [t.assignee];
+              delete t.assignee;
+            }
+          }
+        }
         if (from < 2 && persisted?.settings?.fixedVndToKrw === '0.0546') {
           persisted.settings.fixedVndToKrw = DEFAULT_VND_KRW;
         }

@@ -19,24 +19,28 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([arr], { type: mime });
 }
 
-/** 파일 1장 → 저장된 참조(URL 또는 data URL). 실패 시 throw. */
+/** 파일 1장 → 저장된 참조(URL 또는 data URL). Storage 실패 시 압축 data URL 로 폴백. */
 export async function uploadPhoto(file: File): Promise<string> {
   const uid = useAppStore.getState().cloudUser?.id;
 
   if (supabase && uid) {
-    const dataUrl = await compressImage(file, 1400, 0.78);
-    const blob = dataUrlToBlob(dataUrl);
-    const path = `${uid}/${Date.now()}-${rnd()}.jpg`;
-    const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
-      contentType: 'image/jpeg',
-      upsert: false,
-    });
-    if (error) throw new Error('사진 업로드 실패: ' + error.message);
-    return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    try {
+      const dataUrl = await compressImage(file, 1400, 0.78);
+      const blob = dataUrlToBlob(dataUrl);
+      const path = `${uid}/${Date.now()}-${rnd()}.jpg`;
+      const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+        contentType: 'image/jpeg',
+        upsert: false,
+      });
+      if (error) throw error;
+      return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    } catch (e) {
+      // 버킷 미생성·정책 등 → 앱이 막히지 않게 작게 압축해 문서에 저장
+      console.warn('[photos] Storage 업로드 실패, 로컬 저장으로 폴백', e);
+    }
   }
 
-  // 로컬 모드: 문서에 박히므로 더 작게
-  return compressImage(file, 900, 0.62);
+  return compressImage(file, 900, 0.6);
 }
 
 /** 저장소 URL이면 실제 파일도 삭제 (data URL은 그냥 참조만 제거) */

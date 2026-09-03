@@ -140,7 +140,9 @@ export interface Todo {
   done: boolean;
   priority: TodoPriority;
   order: number;
-  /** 담당자 닉네임 (여행 참여자 중 1명, 없으면 미지정) */
+  /** 담당자 닉네임 (여러 명 가능) */
+  assignees?: string[];
+  /** @deprecated 단일 담당자 (v8 이전) */
   assignee?: string;
 }
 
