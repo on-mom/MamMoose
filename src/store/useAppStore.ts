@@ -5,6 +5,7 @@ import type {
 } from '../types';
 import {
   SEED_PROJECT, SEED_RESTAURANTS, SEED_HOTELS, SEED_SPOTS, SEED_TIMELINE,
+  HANOI_PROJECT, blankProject,
 } from '../data/seed';
 import { commit, undo as histUndo, redo as histRedo } from './history';
 
@@ -22,8 +23,8 @@ function emptyDoc(): TripDoc {
   return { timeline: [], restaurants: [], hotels: [], spots: [], todos: [], expenses: [], messages: [], people: {}, diary: [] };
 }
 
-/** 시드 데이터를 활성 프로젝트에 귀속시켜 초기 문서 생성 */
-function seededDoc(projectId: string): TripDoc {
+/** 하노이 예시 데이터를 프로젝트에 귀속시켜 문서 생성 */
+function hanoiDoc(projectId: string): TripDoc {
   return {
     ...emptyDoc(),
     timeline: SEED_TIMELINE.map((t) => ({ ...t, id: uid(), projectId })),
@@ -32,6 +33,7 @@ function seededDoc(projectId: string): TripDoc {
     spots: SEED_SPOTS.map((s) => ({ ...s, id: uid(), projectId })),
   };
 }
+const START_PROJECT = blankProject();
 
 export interface CloudUser {
   id: string;
@@ -54,8 +56,10 @@ interface AppState {
   setCloudUser: (u: CloudUser | null) => void;
   /** 클라우드에서 받은 여행 목록/문서로 전체 교체 */
   hydrateCloud: (projects: Project[], docs: Docs) => void;
-  /** 로컬 시드 상태로 초기화 (로그아웃) */
+  /** 로컬 빈 여행 상태로 초기화 (로그아웃) */
   resetLocal: () => void;
+  /** 하노이 예시 여행을 추가 (MY › 여행 "예시 불러오기") */
+  loadHanoiSample: () => string;
 
   // --- 탭 네비게이션 ---
   activeTab: TabKey;
@@ -117,18 +121,28 @@ export const useAppStore = create<AppState>()(
       resetLocal: () =>
         set({
           cloudUser: null,
-          projects: [SEED_PROJECT],
-          activeProjectId: SEED_PROJECT.id,
-          present: { [SEED_PROJECT.id]: seededDoc(SEED_PROJECT.id) },
+          projects: [START_PROJECT],
+          activeProjectId: START_PROJECT.id,
+          present: { [START_PROJECT.id]: emptyDoc() },
           past: [],
           future: [],
         }),
+      loadHanoiSample: () => {
+        const id = HANOI_PROJECT.id;
+        set((s) => ({
+          projects: s.projects.some((p) => p.id === id) ? s.projects : [...s.projects, { ...HANOI_PROJECT }],
+          present: { ...s.present, [id]: s.present[id] ?? hanoiDoc(id) },
+          activeProjectId: id,
+          past: [], future: [],
+        }));
+        return id;
+      },
 
       activeTab: 'schedule',
       setTab: (t) => set({ activeTab: t }),
 
-      projects: [SEED_PROJECT],
-      activeProjectId: SEED_PROJECT.id,
+      projects: [START_PROJECT],
+      activeProjectId: START_PROJECT.id,
       setActiveProject: (id) => set({ activeProjectId: id }),
       addProject: (p) => {
         const id = `trip-${uid()}`;
@@ -168,7 +182,7 @@ export const useAppStore = create<AppState>()(
         }),
 
       past: [],
-      present: { [SEED_PROJECT.id]: seededDoc(SEED_PROJECT.id) },
+      present: { [START_PROJECT.id]: emptyDoc() },
       future: [],
       undo: () => set((s) => histUndo(s)),
       redo: () => set((s) => histRedo(s)),

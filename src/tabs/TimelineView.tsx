@@ -486,7 +486,7 @@ function Card({
           key={item.place}
           defaultValue={item.place}
           onBlur={(e) => e.target.value !== item.place && patch({ place: e.target.value })}
-          className="w-full bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-600"
+          className="w-full bg-transparent text-sm font-semibold text-white outline-none"
           placeholder="장소명"
         />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">

@@ -1259,7 +1259,8 @@ export const SEED_FLIGHTS = [
   }
 ] as const;
 
-export const SEED_PROJECT: Project = {
+/** 하노이 예시 여행 — 기본으로는 안 깔림. MY › 여행 "예시 불러오기"로만 추가. */
+export const HANOI_PROJECT: Project = {
   id: 'hanoi-2026-09',
   name: '하노이 커플 여행',
   destination: '베트남 하노이',
@@ -1269,6 +1270,23 @@ export const SEED_PROJECT: Project = {
   outbound: { date: '2026-09-11', flightNo: 'VJ961', depAirport: 'ICN', depTime: '11:05', arrAirport: 'HAN', arrTime: '13:35' },
   inbound: { date: '2026-09-13', flightNo: '9G410', depAirport: 'HAN', depTime: '16:20', arrAirport: 'ICN', arrTime: '22:45' },
 };
+/** 하위호환 alias (persist migrate 등에서 참조) */
+export const SEED_PROJECT = HANOI_PROJECT;
+
+/** 새 계정/새 앱은 빈 여행으로 시작 (오늘~+2일) */
+export function blankProject(): Project {
+  const d = new Date();
+  const iso = (x: Date) => x.toISOString().slice(0, 10);
+  const end = new Date(d); end.setDate(end.getDate() + 2);
+  return {
+    id: 'trip-start',
+    name: '새 여행',
+    destination: '',
+    startDate: iso(d),
+    endDate: iso(end),
+    timezone: 'Asia/Ho_Chi_Minh',
+  };
+}
 
 // 항공편을 고정 타임라인 항목으로 시드 (좌표는 Phase 2 동선에서 채움)
 export const SEED_TIMELINE: Omit<TimelineItem, 'id' | 'projectId'>[] = [

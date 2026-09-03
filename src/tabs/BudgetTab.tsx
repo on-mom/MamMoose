@@ -98,8 +98,8 @@ export default function BudgetTab() {
           inputMode="numeric"
           defaultValue={budget || ''}
           onChange={(e) => commitBudget(Number(e.target.value))}
-          placeholder="예: 1,500,000"
-          className="w-32 rounded bg-moose-edge px-2 py-0.5 text-right text-slate-200 outline-none placeholder:text-slate-600"
+          placeholder="ex) 1,500,000"
+          className="w-32 rounded bg-moose-edge px-2 py-0.5 text-right text-slate-200 outline-none"
         />
       </div>
 

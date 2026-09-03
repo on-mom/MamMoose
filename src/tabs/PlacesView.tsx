@@ -333,19 +333,19 @@ function AddPlaceForm({ projectId, onDone }: { projectId: string; onDone: () => 
     onDone();
   };
 
-  const inp = 'w-full rounded-lg bg-white/5 px-2.5 py-2 text-slate-100 outline-none ring-1 ring-white/5 placeholder:text-slate-600';
+  const inp = 'w-full rounded-lg bg-white/5 px-2.5 py-2 text-slate-100 outline-none ring-1 ring-white/5';
   return (
     <div className="card space-y-2 p-3 text-xs">
-      <input value={f.nameKo} onChange={set('nameKo')} placeholder="장소명 (한국어 표기) *" className={inp} />
-      <input value={f.name} onChange={set('name')} placeholder="원어명 (구글맵 검색용)" className={inp} />
+      <input value={f.nameKo} onChange={set('nameKo')} placeholder="장소명 (한국어 표기, 필수)" className={inp} />
+      <input value={f.name} onChange={set('name')} placeholder="원어명  ex) Pho Thin" className={inp} />
       <div className="grid grid-cols-2 gap-2">
         <input value={f.category} onChange={set('category')} placeholder="카테고리" className={inp} />
         <input value={f.area} onChange={set('area')} list="area-list" placeholder="구역" className={inp} />
         <datalist id="area-list">{areas.map((a) => <option key={a} value={a} />)}</datalist>
       </div>
-      <input value={f.priceVndText} onChange={set('priceVndText')} placeholder="2인 평균 (예: 180,000~240,000 VND)" className={inp} />
+      <input value={f.priceVndText} onChange={set('priceVndText')} placeholder="2인 평균  ex) 180,000~240,000 VND" className={inp} />
       <input value={f.menu} onChange={set('menu')} placeholder="추천 메뉴" className={inp} />
-      <input value={f.mapUrl} onChange={set('mapUrl')} placeholder="구글 지도 링크 (비우면 자동)" className={inp} />
+      <input value={f.mapUrl} onChange={set('mapUrl')} placeholder="구글 지도 링크 (비우면 자동 생성)" className={inp} />
       <input value={f.note} onChange={set('note')} placeholder="특징 / 한줄 소개" className={inp} />
       <div className="flex justify-end gap-2 pt-1">
         <button onClick={onDone} className="px-3 py-1 text-slate-400">취소</button>

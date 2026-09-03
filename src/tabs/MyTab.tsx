@@ -174,7 +174,7 @@ function Chat() {
             onChange={(e) => setProfile({ displayName: e.target.value })}
             onBlur={() => syncMe()}
             placeholder="프로필명"
-            className="flex-1 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-600"
+            className="flex-1 bg-transparent text-sm font-semibold text-white outline-none"
           />
           {profile.chatBgDataUrl ? (
             <button onClick={() => setProfile({ chatBgDataUrl: null })} className="flex items-center gap-1 text-[11px] text-slate-400">
@@ -191,7 +191,7 @@ function Chat() {
           onChange={(e) => setProfile({ statusMessage: e.target.value })}
           onBlur={() => syncMe()}
           placeholder="상태 메시지"
-          className="w-full bg-transparent text-[12px] text-slate-300 outline-none placeholder:text-slate-600"
+          className="w-full bg-transparent text-[12px] text-slate-300 outline-none"
         />
         <input ref={avatarInput} type="file" accept="image/*" hidden onChange={pickImage('avatarDataUrl')} />
         <input ref={bgInput} type="file" accept="image/*" hidden onChange={pickImage('chatBgDataUrl')} />
@@ -238,7 +238,7 @@ function Chat() {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}
           placeholder="메시지"
-          className="flex-1 rounded-full bg-moose-edge px-4 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600"
+          className="flex-1 rounded-full bg-moose-edge px-4 py-2 text-sm text-slate-100 outline-none"
         />
         <button onClick={send} className="rounded-full bg-moose-heart px-3 text-white"><Send size={16} /></button>
       </div>
@@ -281,6 +281,7 @@ function Trips() {
   const activeId = useAppStore((s) => s.activeProjectId);
   const setActive = useAppStore((s) => s.setActiveProject);
   const addProject = useAppStore((s) => s.addProject);
+  const loadHanoiSample = useAppStore((s) => s.loadHanoiSample);
   const patchProject = useAppStore((s) => s.patchProject);
   const removeProject = useAppStore((s) => s.removeProject);
   const cloudUser = useAppStore((s) => s.cloudUser);
@@ -401,7 +402,7 @@ function Trips() {
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             placeholder="초대 코드 입력"
-            className="flex-1 rounded bg-moose-edge px-2 py-1.5 font-mono tracking-widest text-slate-100 outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-slate-600"
+            className="flex-1 rounded bg-moose-edge px-2 py-1.5 font-mono tracking-widest text-slate-100 outline-none placeholder:font-sans placeholder:tracking-normal"
           />
           <button onClick={join} className="btn-heart rounded-lg px-3 font-semibold">참여</button>
         </div>
@@ -411,10 +412,20 @@ function Trips() {
       {adding ? (
         <TripForm onSubmit={saveNew} onCancel={() => setAdding(false)} />
       ) : (
-        <button onClick={() => setAdding(true)}
-          className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-white/10 py-3 text-xs text-slate-400">
-          <Plus size={14} /> 여행 프로젝트 추가
-        </button>
+        <div className="space-y-1.5">
+          <button onClick={() => setAdding(true)}
+            className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-white/10 py-3 text-xs text-slate-400">
+            <Plus size={14} /> 여행 프로젝트 추가
+          </button>
+          {!projects.some((p) => p.id === 'hanoi-2026-09') && (
+            <button
+              onClick={() => setActive(loadHanoiSample())}
+              className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-white/10 py-2.5 text-[11px] text-slate-500"
+            >
+              🫎 예시 여행 담기 · 하노이 3일 (맛집·관광지·숙소 샘플)
+            </button>
+          )}
+        </div>
       )}
       <p className="pt-1 text-center text-[10px] text-slate-600">여행을 선택하면 일정·맛집·Todo·가계부가 해당 여행 데이터로 전환됩니다</p>
 
@@ -497,8 +508,8 @@ function TripForm({ initial, onSubmit, onCancel }: {
 
   return (
     <div className="space-y-2 card border-0 p-3 text-xs">
-      <input value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} placeholder="여행 이름 *" className={`w-full ${inp}`} />
-      <input value={d.destination} onChange={(e) => setD({ ...d, destination: e.target.value })} placeholder="목적지 (예: 베트남 하노이)" className={`w-full ${inp}`} />
+      <input value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} placeholder="여행 이름 (필수)" className={`w-full ${inp}`} />
+      <input value={d.destination} onChange={(e) => setD({ ...d, destination: e.target.value })} placeholder="목적지  ex) 베트남 하노이" className={`w-full ${inp}`} />
       <div className="flex gap-2">
         <input type="date" value={d.startDate} onChange={(e) => setD({ ...d, startDate: e.target.value })} className={`flex-1 ${inp}`} />
         <input type="date" value={d.endDate} onChange={(e) => setD({ ...d, endDate: e.target.value })} className={`flex-1 ${inp}`} />
@@ -521,20 +532,20 @@ function TripForm({ initial, onSubmit, onCancel }: {
               <input
                 value={f.flightNo}
                 onChange={(e) => setLeg(leg, 'flightNo', e.target.value)}
-                placeholder="편명 VJ961" className={`w-24 ${inp}`}
+                placeholder="편명  ex) VJ961" className={`w-28 ${inp}`}
               />
             </div>
             <input
               value={f.carrier || auto}
               onChange={(e) => setLeg(leg, 'carrier', e.target.value)}
-              placeholder="항공사 (편명 입력 시 자동)"
+              placeholder="항공사  ex) 비엣젯항공 (편명 쓰면 자동)"
               className={`w-full ${inp} ${!f.carrier && auto ? 'text-emerald-400' : ''}`}
             />
             <div className="flex items-center gap-1.5">
-              <input value={f.depAirport} onChange={(e) => setLeg(leg, 'depAirport', e.target.value.toUpperCase())} placeholder="ICN" maxLength={4} className={`w-14 uppercase ${inp}`} />
+              <input value={f.depAirport} onChange={(e) => setLeg(leg, 'depAirport', e.target.value.toUpperCase())} placeholder="ex)ICN" maxLength={4} className={`w-16 uppercase ${inp}`} />
               <input type="time" value={f.depTime} onChange={(e) => setLeg(leg, 'depTime', e.target.value)} className={`min-w-0 flex-1 ${inp}`} />
               <span className="text-slate-600">→</span>
-              <input value={f.arrAirport} onChange={(e) => setLeg(leg, 'arrAirport', e.target.value.toUpperCase())} placeholder="HAN" maxLength={4} className={`w-14 uppercase ${inp}`} />
+              <input value={f.arrAirport} onChange={(e) => setLeg(leg, 'arrAirport', e.target.value.toUpperCase())} placeholder="ex)HAN" maxLength={4} className={`w-16 uppercase ${inp}`} />
               <input type="time" value={f.arrTime} onChange={(e) => setLeg(leg, 'arrTime', e.target.value)} className={`min-w-0 flex-1 ${inp}`} />
             </div>
           </div>

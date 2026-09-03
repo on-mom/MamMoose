@@ -68,7 +68,7 @@ export default function TodoTab() {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
           placeholder="할 일 추가"
-          className="flex-1 rounded-lg bg-moose-edge px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600"
+          className="flex-1 rounded-lg bg-moose-edge px-3 py-2 text-sm text-slate-100 outline-none"
         />
         <button onClick={add} className="rounded-lg bg-moose-heart px-3 text-white"><Plus size={16} /></button>
       </div>

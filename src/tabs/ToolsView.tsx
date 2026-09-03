@@ -93,7 +93,7 @@ function Phrasebook() {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="상황·단어 검색 (택시, 계산…)"
-        className="w-full rounded-lg bg-moose-edge px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600"
+        className="w-full rounded-lg bg-moose-edge px-3 py-2 text-sm text-slate-100 outline-none"
       />
       {groups.map((g) => (
         <div key={g.title}>
@@ -155,7 +155,7 @@ function FxCalc() {
         onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ''))}
         inputMode="numeric"
         placeholder={dir === 'v2k' ? '동(₫) 금액' : '원(₩) 금액'}
-        className="w-full rounded-xl bg-moose-edge px-4 py-3 text-right text-xl font-bold text-slate-100 outline-none placeholder:text-slate-600"
+        className="w-full rounded-xl bg-moose-edge px-4 py-3 text-right text-xl font-bold text-slate-100 outline-none"
       />
 
       <div className="rounded-xl bg-moose-heart/10 p-4 text-center">

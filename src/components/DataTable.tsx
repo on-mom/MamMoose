@@ -154,7 +154,7 @@ export default function DataTable<T>({
                           value={text[c.key] ?? ''}
                           onChange={(e) => setText((t) => ({ ...t, [c.key]: e.target.value }))}
                           placeholder="검색"
-                          className="w-full rounded-lg bg-white/5 px-2 py-1 text-[11px] font-normal text-slate-200 outline-none ring-1 ring-white/5 placeholder:text-slate-600"
+                          className="w-full rounded-lg bg-white/5 px-2 py-1 text-[11px] font-normal text-slate-200 outline-none ring-1 ring-white/5"
                         />
                       )}
                       {c.filter === 'range' && (
@@ -164,7 +164,7 @@ export default function DataTable<T>({
                             value={range[c.key]?.min ?? ''}
                             onChange={(e) => setRange((r) => ({ ...r, [c.key]: { ...r[c.key], min: e.target.value } }))}
                             placeholder="최소"
-                            className="w-full rounded-md bg-white/5 px-1 py-1 text-[10px] font-normal text-slate-200 outline-none ring-1 ring-white/5 placeholder:text-slate-600"
+                            className="w-full rounded-md bg-white/5 px-1 py-1 text-[10px] font-normal text-slate-200 outline-none ring-1 ring-white/5"
                           />
                           <span className="text-slate-600">~</span>
                           <input
@@ -172,7 +172,7 @@ export default function DataTable<T>({
                             value={range[c.key]?.max ?? ''}
                             onChange={(e) => setRange((r) => ({ ...r, [c.key]: { ...r[c.key], max: e.target.value } }))}
                             placeholder="최대"
-                            className="w-full rounded-md bg-white/5 px-1 py-1 text-[10px] font-normal text-slate-200 outline-none ring-1 ring-white/5 placeholder:text-slate-600"
+                            className="w-full rounded-md bg-white/5 px-1 py-1 text-[10px] font-normal text-slate-200 outline-none ring-1 ring-white/5"
                           />
                         </div>
                       )}
