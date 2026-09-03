@@ -4,6 +4,9 @@
 
 :root {
   color-scheme: dark;
+  /* 설정에서 바꿀 수 있는 두 색 (R G B) — 기본값은 맘무 팔레트 */
+  --c-accent: 238 134 169; /* moose-heart */
+  --c-bg: 19 16 25;        /* moose-night */
 }
 
 html,
@@ -14,8 +17,10 @@ body,
 
 body {
   margin: 0;
-  /* 따뜻한 밤하늘 + 은은한 로즈 글로우 */
-  background: radial-gradient(120% 60% at 50% 0%, #201826 0%, #0f0c14 60%, #0c0a10 100%);
+  /* 따뜻한 밤하늘 + 은은한 포인트 글로우 */
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgb(var(--c-accent) / 0.06), transparent 55%),
+    radial-gradient(120% 60% at 50% 0%, rgb(var(--c-bg)) 0%, #0f0c14 60%, #0c0a10 100%);
   background-attachment: fixed;
   -webkit-tap-highlight-color: transparent;
   font-family: 'Inter', 'NanumSquare', system-ui, sans-serif;
@@ -69,9 +74,9 @@ textarea::placeholder {
   }
   /* 하트 그라데이션 버튼 */
   .btn-heart {
-    background-image: linear-gradient(135deg, #f094b4, #e0728f);
+    background-image: linear-gradient(135deg, rgb(var(--c-accent)), rgb(var(--c-accent) / 0.78));
     color: #fff;
-    box-shadow: 0 8px 20px -8px rgb(224 114 143 / 0.6);
+    box-shadow: 0 8px 20px -8px rgb(var(--c-accent) / 0.6);
   }
   .btn-heart:active { transform: scale(0.97); }
   /* 모달 표면 (확실히 불투명) */

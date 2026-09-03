@@ -215,6 +215,10 @@ export interface AppSettings {
   rateMode: 'fixed' | 'live';
   /** 여행 후 "추억함 확인" 알림 받기 */
   notifyMemories?: boolean;
+  /** 테마 커스터마이징 — 버튼/포인트 색 (#rrggbb) */
+  themeAccent?: string;
+  /** 테마 커스터마이징 — 배경 색 (#rrggbb) */
+  themeBg?: string;
 }
 
 /** Undo/Redo 대상이 되는 여행 문서 (프로젝트별 데이터 묶음) */

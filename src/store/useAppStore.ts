@@ -104,6 +104,7 @@ interface AppState {
   setPin: (next: string) => void;
   setRate: (patch: Partial<Pick<AppSettings, 'fixedVndToKrw' | 'rateMode'>>) => void;
   setNotifyMemories: (on: boolean) => void;
+  setTheme: (patch: Partial<Pick<AppSettings, 'themeAccent' | 'themeBg'>>) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -216,6 +217,7 @@ export const useAppStore = create<AppState>()(
       setPin: (next) => set((s) => ({ settings: { ...s.settings, pin: next } })),
       setRate: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
       setNotifyMemories: (on) => set((s) => ({ settings: { ...s.settings, notifyMemories: on } })),
+      setTheme: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
     }),
     {
       name: 'mammoose-store',

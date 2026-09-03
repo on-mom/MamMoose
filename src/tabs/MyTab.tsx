@@ -665,6 +665,7 @@ function Settings() {
   const settings = useAppStore((s) => s.settings);
   const setPin = useAppStore((s) => s.setPin);
   const setNotifyMemories = useAppStore((s) => s.setNotifyMemories);
+  const setTheme = useAppStore((s) => s.setTheme);
   const lock = useAppStore((s) => s.lock);
   const cloudUser = useAppStore((s) => s.cloudUser);
   const [cur, setCur] = useState('');
@@ -740,6 +741,36 @@ function Settings() {
             <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${settings.notifyMemories ? 'left-[22px]' : 'left-0.5'}`} />
           </button>
         </label>
+      </section>
+
+      <section className="card space-y-2.5 p-3">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-white">테마 색상</span>
+          {(settings.themeAccent || settings.themeBg) && (
+            <button onClick={() => setTheme({ themeAccent: undefined, themeBg: undefined })} className="text-[11px] text-slate-400">
+              기본값으로
+            </button>
+          )}
+        </div>
+        <label className="flex items-center justify-between">
+          <span className="text-[13px] text-slate-300">버튼 · 포인트 색</span>
+          <input
+            type="color"
+            value={settings.themeAccent ?? '#ee86a9'}
+            onChange={(e) => setTheme({ themeAccent: e.target.value })}
+            className="h-8 w-14 rounded bg-transparent"
+          />
+        </label>
+        <label className="flex items-center justify-between">
+          <span className="text-[13px] text-slate-300">배경 색</span>
+          <input
+            type="color"
+            value={settings.themeBg ?? '#131019'}
+            onChange={(e) => setTheme({ themeBg: e.target.value })}
+            className="h-8 w-14 rounded bg-transparent"
+          />
+        </label>
+        <p className="text-[10px] text-slate-600">둘이 함께 쓰는 앱이라 이 색은 이 기기에만 적용돼요</p>
       </section>
 
       {!cloudUser && (
