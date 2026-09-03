@@ -99,7 +99,8 @@ function Chat() {
 
   // 앱에서 바꾼 프로필명이 우선 (카톡/구글 기본 닉네임보다)
   const myName = (profile.displayName || '').trim() || cloudUser?.name || '나';
-  const myAvatar = cloudUser?.avatar || profile.avatarDataUrl;
+  // 앱에서 올린 사진이 우선 (카톡/구글 기본 아바타보다)
+  const myAvatar = profile.avatarDataUrl || cloudUser?.avatar;
 
   const [uploading, setUploading] = useState(false);
 
@@ -159,6 +160,14 @@ function Chat() {
     name === myName
       ? { name: myName, avatar: myAvatar ?? null, bg: profile.chatBgDataUrl ?? null, statusMessage: profile.statusMessage }
       : people[name] ?? { name };
+
+  // 닉네임 바꾸기 전 이름(카톡 기본 "." 등)으로 남은 내 스냅샷 정리
+  useEffect(() => {
+    const hasStale = [cloudUser?.name, profile.displayName]
+      .some((n) => n && n !== myName && people[n]);
+    if (hasStale) syncMe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myName]);
 
   const Avatar = ({ p, onClick }: { p: Person; onClick?: () => void }) => (
     <button onClick={onClick} disabled={!onClick} className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-moose-edge">

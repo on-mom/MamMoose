@@ -15,11 +15,15 @@ export const getMyName = () => nameOf(useAppStore.getState());
  */
 export function useMemberNames(): string[] {
   const people = useAppStore((s) => s.present[s.activeProjectId]?.people);
+  const cloudName = useAppStore((s) => s.cloudUser?.name);
   const me = useMyName();
 
   const set = new Set<string>([me]);
   for (const k of Object.keys(people ?? {})) {
-    if (k && k !== me) set.add(k);
+    if (!k || k === me) continue;
+    if (k === cloudName) continue; // 내 로그인 기본 닉네임으로 저장된 옛 스냅샷 (닉네임 변경 전)
+    if (!k.replace(/[\s.·・_-]/g, '')) continue; // "." 같은 카톡 기본 프로필명
+    set.add(k);
   }
   return [...set];
 }

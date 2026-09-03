@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react';
-import { ImagePlus, X, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ImagePlus, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { uploadPhoto, deletePhoto } from '../lib/photos';
 
-/** 타임라인·일기 공용 사진 첨부 스트립. */
+/** 타임라인·일기 공용 사진 첨부 스트립 + 전체보기 갤러리. */
 export default function PhotoStrip({
   photos = [],
   onChange,
@@ -17,7 +17,23 @@ export default function PhotoStrip({
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [view, setView] = useState<string | null>(null);
+  const [idx, setIdx] = useState<number | null>(null); // 전체보기 중인 사진 index
+  const touchX = useRef(0);
+
+  const open = idx != null && photos[idx] != null ? idx : null;
+  const go = (d: number) =>
+    setIdx((i) => (i == null ? i : (i + d + photos.length) % photos.length));
+
+  useEffect(() => {
+    if (open == null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') go(-1);
+      else if (e.key === 'ArrowRight') go(1);
+      else if (e.key === 'Escape') setIdx(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, photos.length]);
 
   const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = [...(e.target.files ?? [])].slice(0, max - photos.length);
@@ -43,10 +59,11 @@ export default function PhotoStrip({
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1.5">
-        {photos.map((url) => (
+      {/* 미리보기 — 여러 장이면 세로 스크롤 */}
+      <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">
+        {photos.map((url, i) => (
           <div key={url} className="relative h-16 w-16 overflow-hidden rounded-lg bg-moose-edge">
-            <button onClick={() => setView(url)} className="h-full w-full">
+            <button onClick={() => setIdx(i)} className="h-full w-full">
               <img src={url} alt="" className="h-full w-full object-cover" />
             </button>
             {editable && (
@@ -73,13 +90,51 @@ export default function PhotoStrip({
       {err && <p className="mt-1 text-[10px] text-rose-400">{err}</p>}
       <input ref={inputRef} type="file" accept="image/*" multiple hidden onChange={pick} />
 
-      {view && (
+      {/* 전체보기 갤러리 */}
+      {open != null && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
-          onClick={() => setView(null)}
+          onClick={() => setIdx(null)}
+          onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+          onTouchEnd={(e) => {
+            const d = e.changedTouches[0].clientX - touchX.current;
+            if (Math.abs(d) > 40 && photos.length > 1) go(d < 0 ? 1 : -1);
+          }}
         >
-          <img src={view} alt="" className="max-h-full max-w-full rounded-lg object-contain" />
-          <button className="absolute right-4 top-4 rounded-full bg-white/15 p-2 text-white"><X size={18} /></button>
+          <img
+            src={photos[open]}
+            alt=""
+            className="max-h-full max-w-full rounded-lg object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {/* 순번 배지 */}
+          <div className="absolute right-4 top-4 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
+            {open + 1}/{photos.length}
+          </div>
+          <button
+            onClick={() => setIdx(null)}
+            className="absolute left-4 top-4 rounded-full bg-black/60 p-1.5 text-white"
+          >
+            <X size={16} />
+          </button>
+
+          {photos.length > 1 && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); go(-1); }}
+                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white"
+              >
+                <ChevronLeft size={22} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); go(1); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white"
+              >
+                <ChevronRight size={22} />
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
