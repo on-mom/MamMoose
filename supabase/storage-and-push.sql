@@ -27,10 +27,12 @@ create table if not exists public.push_subscriptions (
   endpoint     text not null unique,
   p256dh       text not null,
   auth         text not null,
+  display_name text,
   user_agent   text,
   created_at   timestamptz default now(),
   last_used_at timestamptz default now()
 );
+alter table public.push_subscriptions add column if not exists display_name text;
 alter table public.push_subscriptions enable row level security;
 
 drop policy if exists "own push subscriptions" on public.push_subscriptions;

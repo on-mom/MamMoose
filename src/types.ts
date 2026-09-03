@@ -67,6 +67,8 @@ export interface TimelineComment {
   text: string;
   /** epoch ms */
   at: number;
+  /** @멘션된 참여자 닉네임 */
+  mentions?: string[];
 }
 export type EntryComment = TimelineComment;
 

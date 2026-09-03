@@ -8,6 +8,7 @@ import { usePlaces, splitAreas, KIND_LABEL, type Place, type PlaceKind } from '.
 import { coordsForArea, AREA_COORDS } from '../lib/areaCoords';
 import { geocode } from '../lib/geocode';
 import { directionsUrl } from '../lib/maps';
+import { pushNotify } from '../lib/push';
 import {
   PlaceFilterControls, applyPlaceFilter, filterSummary, emptyFilterState, type PlaceFilterState,
 } from '../components/PlaceFilter';
@@ -296,7 +297,10 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
 
             <CommentThread
               comments={detail.comments}
-              onAdd={(t) => patchComments(detail, (list) => [...list, { id: uid(), author: me, text: t, at: Date.now() }])}
+              onAdd={(t, mentions) => {
+                patchComments(detail, (list) => [...list, { id: uid(), author: me, text: t, at: Date.now(), mentions: mentions.length ? mentions : undefined }]);
+                if (mentions.length) pushNotify(mentions, `${me}님이 멘션했어요`, `${detail.name}: ${t}`);
+              }}
               onDelete={(cid) => patchComments(detail, (list) => list.filter((c) => c.id !== cid))}
             />
           </div>

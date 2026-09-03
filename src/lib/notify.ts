@@ -44,18 +44,19 @@ const saveSeen = (s: Set<string>) => {
   try { localStorage.setItem(SEEN_KEY, JSON.stringify([...s].slice(-800))); } catch { /* noop */ }
 };
 
-type WithComments = { comments?: { id: string; author: string; text: string }[] };
+type Cmt = { id: string; author: string; text: string; mentions?: string[] };
+type WithComments = { comments?: Cmt[] };
 type DocLike = { timeline?: WithComments[]; restaurants?: WithComments[]; hotels?: WithComments[]; spots?: WithComments[] };
 
 /**
  * 클라우드에서 받은 문서들을 훑어, 내가 처음 보는 + 남이 쓴 코멘트가 있으면 알림.
- * 첫 호출(seed)에서는 알림 없이 기존 코멘트를 "본 것"으로 기록만 한다.
+ * 나를 @멘션한 코멘트는 더 눈에 띄게. 첫 호출(seed)에서는 기록만.
  */
 export function notifyNewComments(docs: Record<string, DocLike>, myName: string, enabled: boolean) {
   let seededBefore = false;
   try { seededBefore = localStorage.getItem(SEEN_KEY) !== null; } catch { /* noop */ }
   const seen = loadSeen();
-  const fresh: { author: string; text: string }[] = [];
+  const fresh: Cmt[] = [];
 
   for (const doc of Object.values(docs)) {
     for (const arr of [doc.timeline, doc.restaurants, doc.hotels, doc.spots]) {
@@ -69,7 +70,14 @@ export function notifyNewComments(docs: Record<string, DocLike>, myName: string,
     }
   }
   saveSeen(seen);
+  if (!fresh.length) return;
 
-  if (fresh.length === 1) fireLocalNotification('맘무스 · 새 코멘트', `${fresh[0].author}: ${fresh[0].text}`);
-  else if (fresh.length > 1) fireLocalNotification('맘무스 · 새 코멘트', `동행자가 코멘트 ${fresh.length}개를 남겼어요`);
+  const mention = fresh.find((c) => (c.mentions ?? []).includes(myName));
+  if (mention) {
+    fireLocalNotification(`맘무스 · ${mention.author}님이 언급했어요`, mention.text);
+  } else if (fresh.length === 1) {
+    fireLocalNotification('맘무스 · 새 코멘트', `${fresh[0].author}: ${fresh[0].text}`);
+  } else {
+    fireLocalNotification('맘무스 · 새 코멘트', `동행자가 코멘트 ${fresh.length}개를 남겼어요`);
+  }
 }

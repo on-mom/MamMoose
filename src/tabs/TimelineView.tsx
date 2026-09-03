@@ -16,6 +16,8 @@ import { computeFocus } from '../lib/timezone';
 import { coordsForArea } from '../lib/areaCoords';
 import { directionsUrl } from '../lib/maps';
 import { useWeather, wxIcon } from '../lib/weather';
+import { useDayTransit } from '../lib/transit';
+import { pushNotify } from '../lib/push';
 import { useMemberNames, useMyName } from '../lib/members';
 import { usePlaces } from '../lib/places';
 import Modal from '../components/Modal';
@@ -250,27 +252,14 @@ export default function TimelineView() {
       {mode === 'read' ? (
         <div className="space-y-4">
           {dayKeys(days).map((k) => (
-            <section key={k} className="space-y-2">
-              <h3 className="font-title text-base font-bold text-white">
-                {k}일차 <span className="text-xs font-normal text-slate-500">{dateOfDay(project.startDate, Number(k))}</span>{dayWeather(k)}
-              </h3>
-              {(board[k] ?? []).length === 0 && (
-                <p className="rounded-lg border border-dashed border-moose-edge py-3 text-center text-[11px] text-slate-600">
-                  일정이 없어요 · [편집]에서 추가하세요
-                </p>
-              )}
-              {(board[k] ?? []).map((id) =>
-                byId[id] ? (
-                  <ReadCard
-                    key={id}
-                    item={byId[id]}
-                    highlight={id === focus.focusId}
-                    innerRef={id === focus.focusId ? focusRef : undefined}
-                    onOpen={() => setDetailId(id)}
-                  />
-                ) : null,
-              )}
-            </section>
+            <ReadDay
+              key={k}
+              label={<>{k}일차 <span className="text-xs font-normal text-slate-500">{dateOfDay(project.startDate, Number(k))}</span>{dayWeather(k)}</>}
+              items={(board[k] ?? []).map((id) => byId[id]).filter(Boolean) as TimelineItem[]}
+              focusId={focus.focusId}
+              focusRef={focusRef}
+              onOpen={setDetailId}
+            />
           ))}
         </div>
       ) : (
@@ -349,6 +338,45 @@ function Row({
         <Card item={item} highlight={highlight} handleProps={{ ...attributes, ...listeners }} />
       </div>
     </div>
+  );
+}
+
+/* ---------- 읽기전용: 하루 ---------- */
+function ReadDay({
+  label, items, focusId, focusRef, onOpen,
+}: {
+  label: React.ReactNode;
+  items: TimelineItem[];
+  focusId?: string | null;
+  focusRef: Ref<HTMLDivElement>;
+  onOpen: (id: string) => void;
+}) {
+  const warns = useDayTransit(items);
+  return (
+    <section className="space-y-2">
+      <h3 className="font-title text-base font-bold text-white">{label}</h3>
+      {items.length === 0 && (
+        <p className="rounded-lg border border-dashed border-moose-edge py-3 text-center text-[11px] text-slate-600">
+          일정이 없어요 · [편집]에서 추가하세요
+        </p>
+      )}
+      {items.map((it) => (
+        <div key={it.id}>
+          <ReadCard
+            item={it}
+            highlight={it.id === focusId}
+            innerRef={it.id === focusId ? focusRef : undefined}
+            onOpen={() => onOpen(it.id)}
+          />
+          {warns[it.id] && (
+            <div className="mt-1 flex items-center gap-1 pl-1 text-[10px] text-amber-400">
+              ⚠️ 다음 장소까지 {warns[it.id].source === 'drive' ? '차로 약 ' : '약 '}{warns[it.id].needMin}분
+              · 지금 {warns[it.id].gapMin}분 여유
+            </div>
+          )}
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -463,7 +491,10 @@ function ItemDetailModal({ item, onClose }: { item: TimelineItem; onClose: () =>
 
         <CommentThread
           comments={item.comments}
-          onAdd={(t) => patchItem((it) => { (it.comments ??= []).push({ id: uid(), author: me, text: t, at: Date.now() }); })}
+          onAdd={(t, mentions) => {
+            patchItem((it) => { (it.comments ??= []).push({ id: uid(), author: me, text: t, at: Date.now(), mentions: mentions.length ? mentions : undefined }); });
+            if (mentions.length) pushNotify(mentions, `${me}님이 멘션했어요`, `${item.place}: ${t}`);
+          }}
           onDelete={(cid) => patchItem((it) => { if (it.comments) it.comments = it.comments.filter((c) => c.id !== cid); })}
         />
       </div>

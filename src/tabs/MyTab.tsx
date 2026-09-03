@@ -17,6 +17,7 @@ import DiaryView from './DiaryView';
 import ToolsView from './ToolsView';
 import MemoriesView, { useMemoryPicks, tripEnded } from './MemoriesView';
 import { ensureNotifyPermission, fireLocalNotification, alreadyNotified, markNotified, canNotify } from '../lib/notify';
+import { enablePush, disablePush, pushSupported } from '../lib/push';
 import { uploadPhoto } from '../lib/photos';
 
 type Sub = 'chat' | 'diary' | 'memories' | 'tools' | 'trips' | 'settings';
@@ -649,8 +650,14 @@ function Settings() {
   const [msg, setMsg] = useState('');
 
   const toggleNotify = async () => {
-    if (settings.notifyMemories) { setNotifyMemories(false); return; }
-    setNotifyMemories(await ensureNotifyPermission());
+    if (settings.notifyMemories) {
+      setNotifyMemories(false);
+      disablePush();
+      return;
+    }
+    const ok = await ensureNotifyPermission();
+    setNotifyMemories(ok);
+    if (ok && pushSupported()) enablePush(); // 백그라운드 푸시도 등록 (발송 함수 배포 시 동작)
   };
 
   const changePin = () => {
