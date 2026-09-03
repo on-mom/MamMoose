@@ -31,8 +31,9 @@ export default function RestaurantsTab() {
   const [view, setView] = useState<'place' | 'stay'>('place');
   return (
     <div className="flex h-full flex-col">
-      <div className="edge min-h-0 flex-1 space-y-3 overflow-y-auto py-3">
-        <h2 className="font-title text-xl font-bold text-white">{view === 'place' ? '장소' : '숙소 후보'}</h2>
+      {/* 콘텐츠: 자체 스크롤 + (장소는) 하단 고정 검색바를 각자 관리 */}
+      <div className="edge flex min-h-0 flex-1 flex-col py-3">
+        <h2 className="mb-2 shrink-0 font-title text-xl font-bold text-white">{view === 'place' ? '장소' : '숙소 후보'}</h2>
         {view === 'place' ? <PlacesView embedded /> : <StayView />}
       </div>
       {/* 하단 고정 전환 바 (엄지 접근) */}
@@ -104,7 +105,7 @@ function StayView() {
   }
 
   return (
-    <div>
+    <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="flex items-center justify-between gap-2 px-0.5 pb-1.5">
         <p className="text-[11px] text-slate-500">2박 기준 · 행을 누르면 상세 (조식 후기·특징)</p>
         <button
