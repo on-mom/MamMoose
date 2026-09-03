@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { MapPin, Utensils } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { MapPin, Utensils, Map as MapIcon } from 'lucide-react';
 import type { Hotel, PoiInfo } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { uid } from '../lib/uid';
@@ -7,12 +7,22 @@ import { useMyName } from '../lib/members';
 import { pushNotify } from '../lib/push';
 import { firstSentence } from '../lib/notify';
 import { hotelArea } from '../lib/places';
+import { coordsForArea } from '../lib/areaCoords';
+import { geocode } from '../lib/geocode';
 import Modal from '../components/Modal';
 import DataTable, { type Column } from '../components/DataTable';
 import CommentThread from '../components/CommentThread';
 import PoiPanel, { PoiFetchButton, useLookupPoi } from '../components/PoiPanel';
+import PlaceMap, { type MapPoint } from '../components/PlaceMap';
 import { accessForArea, fmtVnd } from '../lib/hanoiAccess';
 import PlacesView from './PlacesView';
+
+const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
+const jitter = (id: string) => {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return { dlat: ((h % 100) / 100 - 0.5) * 0.01, dlng: (((h >> 8) % 100) / 100 - 0.5) * 0.01 };
+};
 
 const won = (t: string) => Number((t.match(/[\d,]+/)?.[0] ?? '0').replace(/,/g, '')) * (/만/.test(t) ? 10000 : 1);
 const mapQ = (name: string) => `https://maps.google.com/?q=${encodeURIComponent(name + ' Hanoi')}`;
@@ -59,8 +69,22 @@ function StayView() {
   const mutate = useAppStore((s) => s.mutate);
   const me = useMyName();
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
+  const [mapSel, setMapSel] = useState<string | null>(null);
+  const [geo, setGeo] = useState<Record<string, { lat: number; lng: number }>>({});
   const detail = detailId ? hotels.find((h) => h.id === detailId) ?? null : null;
   const access = detail ? accessForArea(hotelArea(detail)) : null;
+
+  const points: MapPoint[] = useMemo(
+    () => hotels.map((h) => {
+      const g = geo[h.id] ?? (h.poi?.lat != null ? { lat: h.poi.lat, lng: h.poi.lng! } : null);
+      if (g) return { id: h.id, lat: g.lat, lng: g.lng };
+      const c = coordsForArea(hotelArea(h));
+      const j = jitter(h.id);
+      return { id: h.id, lat: c.lat + j.dlat, lng: c.lng + j.dlng };
+    }),
+    [hotels, geo],
+  );
 
   const cols: Column<Hotel>[] = [
     { key: 'name', label: '숙소명', width: 150, sortable: true, filter: 'text', get: (h) => h.name,
@@ -81,12 +105,47 @@ function StayView() {
 
   return (
     <div>
-      <p className="px-0.5 pb-1.5 text-[11px] text-slate-500">9/11~13 · 2박 기준 · 행을 누르면 상세 (조식 후기·특징·지도)</p>
+      <div className="flex items-center justify-between gap-2 px-0.5 pb-1.5">
+        <p className="text-[11px] text-slate-500">2박 기준 · 행을 누르면 상세 (조식 후기·특징)</p>
+        <button
+          onClick={() => setShowMap((v) => !v)}
+          className={`flex shrink-0 items-center gap-1 text-[11px] ${showMap ? 'text-moose-heart' : 'text-slate-400'}`}
+        >
+          <MapIcon size={13} /> 지도
+        </button>
+      </div>
+
+      {showMap && (
+        <div className="mb-2">
+          <PlaceMap
+            points={points}
+            selectedId={mapSel}
+            onSelect={(id) => {
+              setMapSel(id);
+              const h = hotels.find((x) => x.id === id);
+              if (h && !geo[id] && KEY) {
+                geocode(h.address || h.name).then((r) => { if (r) setGeo((m) => ({ ...m, [id]: r })); });
+              }
+            }}
+            height="200px"
+            hint="숙소 위치 미니맵 · 핀을 누르면 상세 위치"
+          />
+          {mapSel && (
+            <button
+              onClick={() => setDetailId(mapSel)}
+              className="mt-1 w-full rounded-lg bg-white/5 py-1.5 text-[11px] text-slate-300"
+            >
+              {hotels.find((h) => h.id === mapSel)?.name} 상세 보기
+            </button>
+          )}
+        </div>
+      )}
+
       <DataTable
         rows={hotels}
         columns={cols}
         rowKey={(h) => h.id}
-        selectedKey={detail?.id ?? null}
+        selectedKey={detail?.id ?? mapSel}
         onRowClick={(h) => setDetailId(h.id)}
       />
       {detail && (
