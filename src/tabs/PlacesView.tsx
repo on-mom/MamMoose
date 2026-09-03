@@ -19,6 +19,7 @@ import CommentThread from '../components/CommentThread';
 import PlaceMap, { type MapPoint } from '../components/PlaceMap';
 import PoiPanel, { PoiFetchButton, useLookupPoi } from '../components/PoiPanel';
 import { accessForArea, fmtVnd } from '../lib/hanoiAccess';
+import HotelTable from '../components/HotelTable';
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 const tripDays = (s: string, e: string) =>
@@ -35,6 +36,7 @@ const arrOf = (kind: PlaceKind): keyof TripDoc =>
 export default function PlacesView({ embedded }: { embedded?: boolean }) {
   const project = useActiveProject()!;
   const places = usePlaces();
+  const hotels = useAppStore((s) => s.present[s.activeProjectId]?.hotels ?? []);
   const mutate = useAppStore((s) => s.mutate);
   const me = useMyName();
   const days = tripDays(project.startDate, project.endDate);
@@ -175,7 +177,14 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
         />
       )}
 
-      {/* 결과 */}
+      {/* 결과 — 숙소만 필터한 경우 비교표, 그 외엔 카드 목록 */}
+      {filter.kind === 'stay' && !selMode ? (
+        <HotelTable
+          hotels={hotels.filter((h) => results.some((r) => r.id === h.id))}
+          selectedId={detailId}
+          onRowClick={setDetailId}
+        />
+      ) : (
       <div className="space-y-1.5">
         {results.map((p) => (
           <div
@@ -223,6 +232,7 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
         ))}
         {results.length === 0 && <p className="py-10 text-center text-xs text-slate-600">조건에 맞는 장소가 없어요</p>}
       </div>
+      )}
 
       {/* 다중선택 담기 바 */}
       {selMode && picked.size > 0 && (
