@@ -5,6 +5,7 @@ import { useAppStore } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { useMyName } from '../lib/members';
 import { pushNotify } from '../lib/push';
+import { firstSentence } from '../lib/notify';
 import { hotelArea } from '../lib/places';
 import Modal from '../components/Modal';
 import DataTable, { type Column } from '../components/DataTable';
@@ -141,7 +142,7 @@ function StayView() {
                   const row = doc.hotels.find((x) => x.id === detail.id);
                   if (row) (row.comments ??= []).push({ id: uid(), author: me, text: t, at: Date.now(), mentions: mentions.length ? mentions : undefined });
                 });
-                if (mentions.length) pushNotify(mentions, `${me}님이 멘션했어요`, `${detail.name}: ${t}`);
+                if (mentions.length) pushNotify(mentions, `${me}님이 언급했어요`, `${detail.name} · "${firstSentence(t)}"`);
               }}
               onDelete={(cid) => mutate((doc) => {
                 const row = doc.hotels.find((x) => x.id === detail.id);

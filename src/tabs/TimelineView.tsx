@@ -18,6 +18,7 @@ import { directionsUrl } from '../lib/maps';
 import { useWeather, wxIcon } from '../lib/weather';
 import { useDayTransit } from '../lib/transit';
 import { pushNotify } from '../lib/push';
+import { firstSentence } from '../lib/notify';
 import { useMemberNames, useMyName } from '../lib/members';
 import { usePlaces } from '../lib/places';
 import Modal from '../components/Modal';
@@ -493,7 +494,7 @@ function ItemDetailModal({ item, onClose }: { item: TimelineItem; onClose: () =>
           comments={item.comments}
           onAdd={(t, mentions) => {
             patchItem((it) => { (it.comments ??= []).push({ id: uid(), author: me, text: t, at: Date.now(), mentions: mentions.length ? mentions : undefined }); });
-            if (mentions.length) pushNotify(mentions, `${me}님이 멘션했어요`, `${item.place}: ${t}`);
+            if (mentions.length) pushNotify(mentions, `${me}님이 언급했어요`, `${item.place} · "${firstSentence(t)}"`);
           }}
           onDelete={(cid) => patchItem((it) => { if (it.comments) it.comments = it.comments.filter((c) => c.id !== cid); })}
         />

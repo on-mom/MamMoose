@@ -9,6 +9,7 @@ import { coordsForArea, AREA_COORDS } from '../lib/areaCoords';
 import { geocode } from '../lib/geocode';
 import { directionsUrl } from '../lib/maps';
 import { pushNotify } from '../lib/push';
+import { firstSentence } from '../lib/notify';
 import {
   PlaceFilterControls, applyPlaceFilter, filterSummary, emptyFilterState, type PlaceFilterState,
 } from '../components/PlaceFilter';
@@ -299,7 +300,7 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
               comments={detail.comments}
               onAdd={(t, mentions) => {
                 patchComments(detail, (list) => [...list, { id: uid(), author: me, text: t, at: Date.now(), mentions: mentions.length ? mentions : undefined }]);
-                if (mentions.length) pushNotify(mentions, `${me}님이 멘션했어요`, `${detail.name}: ${t}`);
+                if (mentions.length) pushNotify(mentions, `${me}님이 언급했어요`, `${detail.name} · "${firstSentence(t)}"`);
               }}
               onDelete={(cid) => patchComments(detail, (list) => list.filter((c) => c.id !== cid))}
             />

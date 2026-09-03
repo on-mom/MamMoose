@@ -17,6 +17,14 @@ export async function ensureNotifyPermission(): Promise<boolean> {
   }
 }
 
+/** 알림 미리보기용 — 첫 문장(또는 앞 50자)만 */
+export function firstSentence(text: string, max = 50): string {
+  const t = (text || '').trim().replace(/\s+/g, ' ');
+  const cut = t.search(/[.!?…。\n]/);
+  const s = cut > 0 ? t.slice(0, cut + 1) : t;
+  return s.length > max ? s.slice(0, max).trimEnd() + '…' : s;
+}
+
 export function fireLocalNotification(title: string, body: string) {
   if (!canNotify() || Notification.permission !== 'granted') return;
   try {
@@ -74,9 +82,9 @@ export function notifyNewComments(docs: Record<string, DocLike>, myName: string,
 
   const mention = fresh.find((c) => (c.mentions ?? []).includes(myName));
   if (mention) {
-    fireLocalNotification(`맘무스 · ${mention.author}님이 언급했어요`, mention.text);
+    fireLocalNotification(`맘무스 · ${mention.author}님이 언급했어요`, `"${firstSentence(mention.text)}"`);
   } else if (fresh.length === 1) {
-    fireLocalNotification('맘무스 · 새 코멘트', `${fresh[0].author}: ${fresh[0].text}`);
+    fireLocalNotification('맘무스 · 새 코멘트', `${fresh[0].author}: ${firstSentence(fresh[0].text)}`);
   } else {
     fireLocalNotification('맘무스 · 새 코멘트', `동행자가 코멘트 ${fresh.length}개를 남겼어요`);
   }
