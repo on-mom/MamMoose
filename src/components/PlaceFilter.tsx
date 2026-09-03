@@ -3,7 +3,9 @@ import { ArrowUpDown } from 'lucide-react';
 import { KIND_LABEL, type Place, type PlaceKind } from '../lib/places';
 import { ZONES, zonesOf, type ZoneId } from '../lib/zones';
 
-const KINDS: PlaceKind[] = ['landmark', 'food', 'stay'];
+export type KindFilter = PlaceKind | 'all';
+const KINDS: KindFilter[] = ['all', 'landmark', 'food', 'stay'];
+const kindLabel = (k: KindFilter) => (k === 'all' ? '전체' : KIND_LABEL[k].split('·')[0]);
 export type PlaceSort = 'default' | 'name' | 'price';
 const SORTS: [PlaceSort, string][] = [['default', '기본순'], ['name', '이름순'], ['price', '가격순']];
 
@@ -12,19 +14,19 @@ export interface PlaceFilterState {
   primary: 'area' | 'kind';
   /** 선택된 존 id들 (빈 배열 = 전체) */
   zoneSel: string[];
-  kind: PlaceKind;
+  kind: KindFilter;
   cat: string;
   sort: PlaceSort;
 }
 export const emptyFilterState: PlaceFilterState = {
-  primary: 'area', zoneSel: [], kind: 'food', cat: '전체', sort: 'default',
+  primary: 'area', zoneSel: [], kind: 'all', cat: '전체', sort: 'default',
 };
 
 const inZones = (area: string, sel: string[]) =>
   !sel.length || zonesOf(area).some((z) => sel.includes(z));
 
 export function applyPlaceFilter(places: Place[], f: PlaceFilterState): Place[] {
-  let r = places.filter((p) => p.kind === f.kind);
+  let r = f.kind === 'all' ? places : places.filter((p) => p.kind === f.kind);
   r = r.filter((p) => inZones(p.area, f.zoneSel));
   if (f.cat !== '전체') r = r.filter((p) => p.category === f.cat);
   if (f.sort === 'name') r = [...r].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
@@ -34,7 +36,7 @@ export function applyPlaceFilter(places: Place[], f: PlaceFilterState): Place[] 
 
 /** 선택된 필터를 사람이 읽는 짧은 요약 (검색 버튼 옆) */
 export function filterSummary(f: PlaceFilterState): string {
-  const parts = [KIND_LABEL[f.kind].split('·')[0]];
+  const parts = [f.kind === 'all' && !f.zoneSel.length && f.cat === '전체' ? '관광지·맛집·숙소' : kindLabel(f.kind)];
   if (f.zoneSel.length) {
     const names = f.zoneSel.map((id) => ZONES.find((z) => z.id === id)?.label.split('·')[0] ?? id);
     parts.push(names.slice(0, 2).join('·') + (names.length > 2 ? '…' : ''));
@@ -54,7 +56,7 @@ export function PlaceFilterControls({
   onChange: (next: PlaceFilterState) => void;
 }) {
   const set = (patch: Partial<PlaceFilterState>) => onChange({ ...state, ...patch });
-  const byKind = (list: Place[]) => list.filter((p) => p.kind === state.kind);
+  const byKind = (list: Place[]) => (state.kind === 'all' ? list : list.filter((p) => p.kind === state.kind));
   const byZone = (list: Place[]) => list.filter((p) => inZones(p.area, state.zoneSel));
 
   const zoneCounts = useMemo(() => {
@@ -121,8 +123,8 @@ export function PlaceFilterControls({
               state.kind === k ? 'btn-heart' : 'bg-white/5 text-slate-400'
             }`}
           >
-            {KIND_LABEL[k].split('·')[0]}
-            <span className="ml-1 opacity-60">{kindCounts[k] ?? 0}</span>
+            {kindLabel(k)}
+            <span className="ml-1 opacity-60">{k === 'all' ? places.length : (kindCounts[k] ?? 0)}</span>
           </button>
         ))}
       </div>

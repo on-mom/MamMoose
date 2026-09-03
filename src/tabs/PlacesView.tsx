@@ -18,6 +18,7 @@ import Modal from '../components/Modal';
 import CommentThread from '../components/CommentThread';
 import PlaceMap, { type MapPoint } from '../components/PlaceMap';
 import PoiPanel, { PoiFetchButton, useLookupPoi } from '../components/PoiPanel';
+import { accessForArea, fmtVnd } from '../lib/hanoiAccess';
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 const tripDays = (s: string, e: string) =>
@@ -124,9 +125,10 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
   );
 
   return (
-    <div className={embedded ? 'flex min-h-0 flex-1 flex-col' : 'edge space-y-2.5 py-3'}>
+    <div className={embedded ? 'edge flex min-h-0 flex-1 flex-col py-3' : 'edge space-y-2.5 py-3'}>
       {!embedded && searchBar}
-      <div className={embedded ? 'min-h-0 flex-1 space-y-2.5 overflow-y-auto' : 'space-y-2.5'}>
+      {embedded && <h2 className="mb-2 shrink-0 font-title text-xl font-bold text-white">탐색</h2>}
+      <div className={embedded ? '-mx-0.5 min-h-0 flex-1 space-y-2.5 overflow-y-auto px-0.5' : 'space-y-2.5'}>
 
       {/* 액션 줄 */}
       <div className="flex items-center justify-between text-xs">
@@ -310,11 +312,13 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
             )}
             {detail.priceText && (
               <div className="rounded-xl bg-white/[0.04] p-3 text-xs">
-                <div className="text-slate-500">가격</div>
+                <div className="text-slate-500">{detail.kind === 'stay' ? '2박 총액' : '가격'}</div>
                 <div className="text-sm font-semibold text-slate-100">{detail.priceText}</div>
               </div>
             )}
             {detail.note && <div className="text-[13px] leading-relaxed text-slate-300">{detail.note}</div>}
+
+            {detail.kind === 'stay' && <StayExtra place={detail} />}
 
             <PoiSection place={detail} onSave={(poi) => patchPoi(detail, poi)} />
 
@@ -328,6 +332,40 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
             />
           </div>
         </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ---------- 숙소 상세 추가 정보 (조식·인근·그랩 이동) ---------- */
+function StayExtra({ place }: { place: Place }) {
+  const access = place.area ? accessForArea(place.area) : null;
+  return (
+    <div className="space-y-2.5">
+      {place.nearby && (
+        <div>
+          <div className="text-[11px] text-slate-500">인근 관광지</div>
+          <div className="text-[13px] text-slate-200">{place.nearby}</div>
+        </div>
+      )}
+      {place.breakfast && (
+        <div className="flex gap-2 rounded-xl bg-moose-heart/10 p-3">
+          <Utensils size={15} className="mt-0.5 shrink-0 text-moose-heart" />
+          <div>
+            <div className="text-[11px] font-semibold text-moose-heart">조식 후기</div>
+            <div className="text-[13px] text-slate-100">{place.breakfast}</div>
+          </div>
+        </div>
+      )}
+      {access && (
+        <div className="rounded-xl bg-white/[0.04] p-3">
+          <div className="text-[11px] font-semibold text-moose-heart">🚕 그랩 이동 (예상 · 러시아워 제외)</div>
+          <div className="mt-1.5 grid grid-cols-1 gap-1 text-[12px] text-slate-200">
+            <div className="flex justify-between"><span>노이바이 공항</span><span className="text-slate-400">{access.airportMin}분 · {fmtVnd(access.airportVnd)}</span></div>
+            <div className="flex justify-between"><span>도심 (호안끼엠)</span><span className="text-slate-400">{access.centerMin}분 · {fmtVnd(access.centerVnd)}</span></div>
+            <div className="flex justify-between"><span>구시가지 (올드쿼터)</span><span className="text-slate-400">{access.oldMin}분 · {fmtVnd(access.oldVnd)}</span></div>
+          </div>
+        </div>
       )}
     </div>
   );

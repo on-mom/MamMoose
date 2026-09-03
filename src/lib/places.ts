@@ -33,6 +33,10 @@ export interface Place {
   comments?: EntryComment[];
   /** 구글 지도에서 불러온 기본 정보 */
   poi?: PoiInfo;
+  /** 숙소(stay) 전용 정보 */
+  breakfast?: string;
+  nearby?: string;
+  grade?: string;
 }
 
 // 숙소 주소 → 한국식 구역명 (RestaurantsTab 에서 이동)
@@ -85,6 +89,7 @@ export function usePlaces(): Place[] {
         priceValue: won(h.priceTotalText), rating: h.rating, note: h.feature,
         mapUrl: `https://maps.google.com/?q=${encodeURIComponent(h.name + ' Hanoi')}`,
         comments: h.comments, poi: h.poi,
+        breakfast: h.breakfast || undefined, nearby: h.nearby || undefined, grade: h.grade || undefined,
       });
     }
     return out;

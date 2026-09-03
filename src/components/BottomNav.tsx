@@ -1,10 +1,10 @@
-import { CalendarDays, UtensilsCrossed, CheckSquare, Wallet, User } from 'lucide-react';
+import { CalendarDays, Search, CheckSquare, Wallet, User } from 'lucide-react';
 import type { TabKey } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
 const TABS: { key: TabKey; label: string; Icon: typeof CalendarDays }[] = [
   { key: 'schedule', label: '일정', Icon: CalendarDays },
-  { key: 'restaurants', label: '맛집', Icon: UtensilsCrossed },
+  { key: 'restaurants', label: '탐색', Icon: Search },
   { key: 'todo', label: 'Todo', Icon: CheckSquare },
   { key: 'budget', label: '가계부', Icon: Wallet },
   { key: 'my', label: 'MY', Icon: User },
