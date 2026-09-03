@@ -44,6 +44,11 @@ body {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
 }
+@keyframes stamp {
+  0% { opacity: 0; transform: rotate(-6deg) scale(2.4); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: rotate(-6deg) scale(1); }
+}
 
 @layer components {
   /* 부드럽고 사랑스러운 카드 */

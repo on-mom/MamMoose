@@ -5,7 +5,7 @@ import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { toKrw, commas, cachedRate, fetchVndKrwRate, FALLBACK_VND_KRW } from '../lib/currency';
 import { useDebounced } from '../lib/useDebounced';
-import { MooseEmpty } from '../components/Moose';
+import { MooseEmpty, Moose } from '../components/Moose';
 
 const CATS: ExpenseCategory[] = ['숙소', '쇼핑', '항공', '식사', '체험', '기타'];
 
@@ -15,6 +15,7 @@ export default function BudgetTab() {
   const settings = useAppStore((s) => s.settings);
   const setRate = useAppStore((s) => s.setRate);
   const mutate = useAppStore((s) => s.mutate);
+  const patchProject = useAppStore((s) => s.patchProject);
 
   const [live, setLive] = useState<number>(cachedRate());
   const [syncing, setSyncing] = useState(false);
@@ -38,6 +39,12 @@ export default function BudgetTab() {
 
   const totalVnd = rows.reduce((s, e) => s + (Number(e.amountVnd) || 0), 0);
   const totalKrw = rows.reduce((s, e) => s + Number(toKrw(e.amountVnd || '0', rate)), 0);
+
+  // 예산은 (필터 무관) 여행 전체 지출 기준
+  const tripTotalKrw = expenses.reduce((s, e) => s + Number(toKrw(e.amountVnd || '0', rate)), 0);
+  const budget = project.budgetKrw ?? 0;
+  const over = budget > 0 && tripTotalKrw > budget;
+  const commitBudget = useDebounced((v: number) => patchProject(project.id, { budgetKrw: v || undefined }), 700);
 
   const dates = Array.from(new Set(expenses.map((e) => e.date))).sort().reverse();
 
@@ -80,6 +87,20 @@ export default function BudgetTab() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* 예산 */}
+      <div className="mt-2 flex items-center justify-between rounded-lg bg-moose-dusk/70 px-3 py-2 text-[11px]">
+        <span className="text-slate-400">이 여행 예산 (KRW)</span>
+        <input
+          key={project.id}
+          type="number"
+          inputMode="numeric"
+          defaultValue={budget || ''}
+          onChange={(e) => commitBudget(Number(e.target.value))}
+          placeholder="예: 1,500,000"
+          className="w-32 rounded bg-moose-edge px-2 py-0.5 text-right text-slate-200 outline-none placeholder:text-slate-600"
+        />
       </div>
 
       <AddForm projectId={project.id} rate={rate} />
@@ -130,6 +151,36 @@ export default function BudgetTab() {
 
       {/* 하단 고정 합계 */}
       <div className="mt-2 border-t border-moose-edge pt-2">
+        {budget > 0 && (
+          <div className="mb-2">
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div
+                className={`h-full rounded-full ${over ? 'bg-rose-400' : 'bg-moose-heart'}`}
+                style={{ width: `${Math.min(100, (tripTotalKrw / budget) * 100)}%` }}
+              />
+            </div>
+            <div className="mt-1 flex justify-between text-[10px] text-slate-500">
+              <span>예산 {commas(budget)}원 · 전체 지출 {commas(Math.round(tripTotalKrw))}원</span>
+              <span className={over ? 'text-rose-300' : ''}>{Math.round((tripTotalKrw / budget) * 100)}%</span>
+            </div>
+          </div>
+        )}
+
+        {over && (
+          <div className="mb-2 flex justify-center">
+            <div
+              className="flex items-center gap-2 rounded-xl border-2 border-dashed border-moose-heart/70 bg-moose-heart/10 px-3 py-1.5 text-moose-heart animate-[stamp_.4s_cubic-bezier(.2,1.5,.4,1)]"
+              style={{ transform: 'rotate(-6deg)' }}
+            >
+              <Moose variant="face" className="h-7 w-7" alt="" />
+              <div className="text-[11px] font-bold leading-tight">
+                큰맘 먹고 지른<br />예쁜 지출!
+                <span className="ml-1 font-normal opacity-70">+{commas(Math.round(tripTotalKrw - budget))}원</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between text-sm">
           <span className="text-slate-400">합계 ({rows.length}건)</span>
           <div className="text-right">

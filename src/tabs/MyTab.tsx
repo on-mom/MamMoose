@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Check, LogOut, Plus, Send, Camera, Image as ImageIcon, UserPlus, Copy, AlertTriangle,
   MoreVertical, Pencil, Trash2,
@@ -14,6 +14,7 @@ import { outboundText, inboundText, carrierOf } from '../lib/flight';
 import { CITY_TZ } from '../lib/cities';
 import DiaryView from './DiaryView';
 import MemoriesView, { useMemoryPicks, tripEnded } from './MemoriesView';
+import { ensureNotifyPermission, fireLocalNotification, alreadyNotified, markNotified, canNotify } from '../lib/notify';
 
 type Sub = 'chat' | 'diary' | 'memories' | 'trips' | 'settings';
 const hhmm = (ts: number) =>
@@ -33,7 +34,15 @@ export default function MyTab() {
   const cloudError = useAppStore((s) => s.cloudError);
   const project = useActiveProject();
   const picks = useMemoryPicks();
+  const notifyOn = useAppStore((s) => s.settings.notifyMemories);
   const showMemories = !!project && (tripEnded(project) || picks.length > 0);
+
+  useEffect(() => {
+    if (project && notifyOn && tripEnded(project) && picks.length > 0 && !alreadyNotified(project.id)) {
+      fireLocalNotification('맘무스 · 추억함', `${project.name} — 둘이 함께 좋아한 ${picks.length}곳이 기다리고 있어요 💗`);
+      markNotified(project.id);
+    }
+  }, [project, notifyOn, picks.length]);
 
   const tabs: [Sub, string][] = [
     ['chat', '채팅'], ['diary', '일기'],
@@ -540,11 +549,17 @@ function TripForm({ initial, onSubmit, onCancel }: {
 function Settings() {
   const settings = useAppStore((s) => s.settings);
   const setPin = useAppStore((s) => s.setPin);
+  const setNotifyMemories = useAppStore((s) => s.setNotifyMemories);
   const lock = useAppStore((s) => s.lock);
   const cloudUser = useAppStore((s) => s.cloudUser);
   const [cur, setCur] = useState('');
   const [next, setNext] = useState('');
   const [msg, setMsg] = useState('');
+
+  const toggleNotify = async () => {
+    if (settings.notifyMemories) { setNotifyMemories(false); return; }
+    setNotifyMemories(await ensureNotifyPermission());
+  };
 
   const changePin = () => {
     if (cur !== settings.pin) return setMsg('현재 PIN이 일치하지 않습니다');
@@ -582,13 +597,37 @@ function Settings() {
         </section>
       )}
 
+      <section className="card p-3">
+        <label className="flex items-center justify-between gap-2">
+          <span>
+            <span className="font-semibold text-white">여행 후 추억함 알림</span>
+            <span className="mt-0.5 block text-[11px] text-slate-500">
+              {canNotify()
+                ? '여행이 끝나면 “둘이 함께 좋아한 곳” 알림을 보내드려요'
+                : '이 브라우저는 알림을 지원하지 않아요'}
+            </span>
+          </span>
+          <button
+            role="switch"
+            aria-checked={!!settings.notifyMemories}
+            disabled={!canNotify()}
+            onClick={toggleNotify}
+            className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+              settings.notifyMemories ? 'bg-moose-heart' : 'bg-white/15'
+            } disabled:opacity-40`}
+          >
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${settings.notifyMemories ? 'left-[22px]' : 'left-0.5'}`} />
+          </button>
+        </label>
+      </section>
+
       {!cloudUser && (
         <button onClick={lock} className="flex w-full items-center justify-center gap-2 rounded-xl border border-moose-edge py-3 text-slate-300">
           <LogOut size={15} /> 잠금 화면으로
         </button>
       )}
       <p className="text-center text-[10px] text-slate-600">
-        맘무스 v0.3 · {cloudEnabled ? '클라우드 연결됨' : '로컬 모드'}
+        맘무스 v0.4 · {cloudEnabled ? '클라우드 연결됨' : '로컬 모드'}
       </p>
     </div>
   );

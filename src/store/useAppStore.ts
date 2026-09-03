@@ -87,6 +87,7 @@ interface AppState {
   settings: AppSettings;
   setPin: (next: string) => void;
   setRate: (patch: Partial<Pick<AppSettings, 'fixedVndToKrw' | 'rateMode'>>) => void;
+  setNotifyMemories: (on: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -188,6 +189,7 @@ export const useAppStore = create<AppState>()(
       settings: { pin: DEFAULT_PIN, fixedVndToKrw: DEFAULT_VND_KRW, rateMode: 'fixed' },
       setPin: (next) => set((s) => ({ settings: { ...s.settings, pin: next } })),
       setRate: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
+      setNotifyMemories: (on) => set((s) => ({ settings: { ...s.settings, notifyMemories: on } })),
     }),
     {
       name: 'mammoose-store',

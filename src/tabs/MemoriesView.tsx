@@ -3,6 +3,7 @@ import { Heart, MapPin } from 'lucide-react';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { useMemberNames } from '../lib/members';
 import { MooseEmpty } from '../components/Moose';
+import CoupleMoose from '../components/CoupleMoose';
 
 const dayLabel = (start: string, day: number) => {
   const d = new Date(start + 'T00:00:00');
@@ -37,11 +38,10 @@ export default function MemoriesView() {
 
   return (
     <div className="space-y-3 overflow-y-auto pb-2">
-      {/* 커플 맘무 일러스트 (제작 필요 — 임시 플레이스홀더) */}
-      <div className="flex flex-col items-center gap-1 rounded-2xl bg-gradient-to-b from-moose-heart/15 to-transparent py-5">
-        <div className="text-3xl">🫎<span className="mx-0.5 align-middle text-2xl">💗</span>🫎</div>
+      {/* 커플 맘무 일러스트 */}
+      <div className="flex flex-col items-center gap-1 rounded-2xl bg-gradient-to-b from-moose-heart/15 to-transparent py-4">
+        <CoupleMoose className="mb-1" />
         <div className="font-title text-sm font-bold text-white">우리 추억함</div>
-        <div className="text-[9px] text-slate-600">‘하트 뿔 맞댄 두 맘무’ 일러스트 자리 (시안 준비 중)</div>
         <div className="text-[11px] text-slate-400">둘 다 ♥ 누른 곳 {picks.length}곳</div>
       </div>
 

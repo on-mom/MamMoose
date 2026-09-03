@@ -30,6 +30,8 @@ export interface Project {
   /** 구버전 자유 텍스트 (하위호환 표시용) */
   outboundFlight?: string;
   inboundFlight?: string;
+  /** 이 여행 예산 (KRW). 초과 시 가계부에 "예쁜 지출" 도장 */
+  budgetKrw?: number;
 }
 
 /** 일정 탭 > 타임라인 항목. 동선 탭의 지도 마커와 양방향 동기화(Phase 2) */
@@ -193,6 +195,8 @@ export interface AppSettings {
   fixedVndToKrw: string;
   /** 환율 모드 */
   rateMode: 'fixed' | 'live';
+  /** 여행 후 "추억함 확인" 알림 받기 */
+  notifyMemories?: boolean;
 }
 
 /** Undo/Redo 대상이 되는 여행 문서 (프로젝트별 데이터 묶음) */
