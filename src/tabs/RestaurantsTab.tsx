@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MapPin, Utensils } from 'lucide-react';
-import type { Hotel } from '../types';
+import type { Hotel, PoiInfo } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { useMyName } from '../lib/members';
@@ -10,6 +10,7 @@ import { hotelArea } from '../lib/places';
 import Modal from '../components/Modal';
 import DataTable, { type Column } from '../components/DataTable';
 import CommentThread from '../components/CommentThread';
+import PoiPanel, { PoiFetchButton, useLookupPoi } from '../components/PoiPanel';
 import { accessForArea, fmtVnd } from '../lib/hanoiAccess';
 import PlacesView from './PlacesView';
 
@@ -40,6 +41,16 @@ export default function RestaurantsTab() {
       </div>
     </div>
   );
+}
+
+function HotelPoi({ hotel, onSave }: { hotel: Hotel; onSave: (poi: PoiInfo) => void }) {
+  const { run, busy, error } = useLookupPoi();
+  const fetch = async () => {
+    const info = await run({ name: `${hotel.name} ${hotel.address}` });
+    if (info) onSave(info);
+  };
+  if (hotel.poi) return <PoiPanel poi={hotel.poi} onRefresh={fetch} />;
+  return <PoiFetchButton busy={busy} error={error} onClick={fetch} label="구글 지도에서 정보 불러오기" />;
 }
 
 /* ================= 숙소 후보 ================= */
@@ -139,6 +150,11 @@ function StayView() {
                 </div>
               </div>
             )}
+
+            <HotelPoi hotel={detail} onSave={(poi) => mutate((doc) => {
+              const row = doc.hotels.find((x) => x.id === detail.id);
+              if (row) row.poi = poi;
+            })} />
 
             <CommentThread
               comments={detail.comments}

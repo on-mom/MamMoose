@@ -105,6 +105,23 @@ export interface Restaurant {
   custom?: boolean;
   /** 상세 모달 댓글 */
   comments?: EntryComment[];
+  /** 구글 지도에서 불러온 기본 정보 (주소·영업시간·평점 등) */
+  poi?: PoiInfo;
+}
+
+/** 구글 Places 로 불러온 장소 기본 정보 */
+export interface PoiInfo {
+  address?: string;
+  hours?: string[];
+  openNow?: boolean;
+  rating?: number;
+  ratingCount?: number;
+  phone?: string;
+  website?: string;
+  mapUrl?: string;
+  lat?: number;
+  lng?: number;
+  fetchedAt: number;
 }
 
 /** 숙소 후보 (MY 탭 여행 정보 / 맛집 탭 보조 시드) */
@@ -121,6 +138,7 @@ export interface Hotel {
   breakfast: string;
   /** 상세 모달 댓글 */
   comments?: EntryComment[];
+  poi?: PoiInfo;
 }
 
 /** 추천 관광지 (일정/동선 탭 시드) */
@@ -134,6 +152,7 @@ export interface Spot {
   nearby: string;
   /** 상세 모달 댓글 */
   comments?: EntryComment[];
+  poi?: PoiInfo;
 }
 
 export type TodoPriority = 'high' | 'mid' | 'low';

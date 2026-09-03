@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
 import { Crosshair, X, LocateFixed, Loader2, Navigation } from 'lucide-react';
+import { GMAPS_LIBRARIES, GMAPS_LANGUAGE } from '../lib/gmaps';
 import type { TimelineItem } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { geocode } from '../lib/geocode';
@@ -23,7 +24,7 @@ export default function MapView() {
   const [day, setDay] = useState(1);
   const [geoBusy, setGeoBusy] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const { isLoaded } = useJsApiLoader({ id: 'gmaps', googleMapsApiKey: KEY });
+  const { isLoaded } = useJsApiLoader({ id: 'gmaps', googleMapsApiKey: KEY, libraries: GMAPS_LIBRARIES, language: GMAPS_LANGUAGE });
 
   const dayItems = useMemo(
     () => items.filter((i) => i.day === day).sort((a, b) => a.order - b.order),

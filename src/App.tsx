@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
+import { GMAPS_LIBRARIES, GMAPS_LANGUAGE } from './lib/gmaps';
 import { useAppStore } from './store/useAppStore';
 import { initCloudSync } from './store/cloudSync';
 import { useUndoRedoHotkeys } from './lib/useUndoRedoHotkeys';
@@ -10,7 +11,7 @@ const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 /** Google Maps JS를 앱 전역에 1회 로드 (지도·지오코딩·소요시간 공용). 키 있을 때만 렌더됨 */
 function MapsBootstrap() {
-  useJsApiLoader({ id: 'gmaps', googleMapsApiKey: MAPS_KEY! });
+  useJsApiLoader({ id: 'gmaps', googleMapsApiKey: MAPS_KEY!, libraries: GMAPS_LIBRARIES, language: GMAPS_LANGUAGE });
   return null;
 }
 

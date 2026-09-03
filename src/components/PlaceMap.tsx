@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { GoogleMap, Marker, Polyline, useJsApiLoader } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
+import { GMAPS_LIBRARIES, GMAPS_LANGUAGE } from '../lib/gmaps';
 
 /** 동선·맛집·숙소 공용 지도. 키 있으면 실제 구글맵, 없으면 Mock 그리드. */
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
@@ -34,7 +35,7 @@ export default function PlaceMap(props: Props) {
 }
 
 function GMap({ points, selectedId, onSelect, onDrag, route, height = '220px' }: Props) {
-  const { isLoaded } = useJsApiLoader({ id: 'gmaps', googleMapsApiKey: KEY });
+  const { isLoaded } = useJsApiLoader({ id: 'gmaps', googleMapsApiKey: KEY, libraries: GMAPS_LIBRARIES, language: GMAPS_LANGUAGE });
   const mapRef = useRef<google.maps.Map | null>(null);
 
   const fit = () => {

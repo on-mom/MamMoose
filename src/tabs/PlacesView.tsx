@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Plus, ExternalLink, Check, Search, Map as MapIcon, X, Utensils, Navigation, PencilLine } from 'lucide-react';
-import type { EntryComment, TripDoc } from '../types';
+import type { EntryComment, PoiInfo, TripDoc } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { useMyName } from '../lib/members';
@@ -17,6 +17,7 @@ import { BottomSheet } from '../components/Modal';
 import Modal from '../components/Modal';
 import CommentThread from '../components/CommentThread';
 import PlaceMap, { type MapPoint } from '../components/PlaceMap';
+import PoiPanel, { PoiFetchButton, useLookupPoi } from '../components/PoiPanel';
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 const tripDays = (s: string, e: string) =>
@@ -92,6 +93,12 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
       const arr = doc[arrOf(p.kind)] as Array<{ id: string; comments?: EntryComment[] }>;
       const row = arr.find((x) => x.id === p.id);
       if (row) row.comments = fn(row.comments ?? []);
+    });
+  const patchPoi = (p: Place, poi: PoiInfo) =>
+    mutate((doc) => {
+      const arr = doc[arrOf(p.kind)] as Array<{ id: string; poi?: PoiInfo }>;
+      const row = arr.find((x) => x.id === p.id);
+      if (row) row.poi = poi;
     });
 
   const points: MapPoint[] = useMemo(
@@ -298,6 +305,8 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
             )}
             {detail.note && <div className="text-[13px] leading-relaxed text-slate-300">{detail.note}</div>}
 
+            <PoiSection place={detail} onSave={(poi) => patchPoi(detail, poi)} />
+
             <CommentThread
               comments={detail.comments}
               onAdd={(t, mentions) => {
@@ -313,12 +322,36 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
   );
 }
 
+/* ---------- 상세 모달의 구글 지도 정보 (없으면 불러오기 버튼) ---------- */
+function PoiSection({ place, onSave }: { place: Place; onSave: (poi: PoiInfo) => void }) {
+  const { run, busy, error } = useLookupPoi();
+  const fetch = async () => {
+    const info = await run({ mapUrl: place.mapUrl, name: place.origName || place.name });
+    if (info) onSave(info);
+  };
+  if (place.poi) return <PoiPanel poi={place.poi} onRefresh={fetch} />;
+  return <PoiFetchButton busy={busy} error={error} onClick={fetch} />;
+}
+
 /* ---------- 장소 직접 추가 (맛집으로 등록) ---------- */
 function AddPlaceForm({ projectId, onDone }: { projectId: string; onDone: () => void }) {
   const mutate = useAppStore((s) => s.mutate);
   const [f, setF] = useState({ nameKo: '', name: '', category: '', area: '', mapUrl: '', priceVndText: '', menu: '', note: '' });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const areas = Object.keys(AREA_COORDS);
+  const [poi, setPoi] = useState<PoiInfo | undefined>();
+  const { run, busy, error } = useLookupPoi();
+
+  const fetchPoi = async () => {
+    const info = await run({ mapUrl: f.mapUrl, name: f.name || f.nameKo });
+    if (!info) return;
+    setPoi(info);
+    setF((p) => ({
+      ...p,
+      area: p.area || info.address?.split(',').slice(-3, -2)[0]?.trim() || p.area,
+      mapUrl: p.mapUrl || info.mapUrl || p.mapUrl,
+    }));
+  };
 
   const submit = () => {
     const display = f.nameKo.trim() || f.name.trim();
@@ -330,11 +363,12 @@ function AddPlaceForm({ projectId, onDone }: { projectId: string; onDone: () => 
         nameKo: f.nameKo.trim() || undefined,
         category: f.category.trim() || '기타',
         area: f.area.trim(),
-        mapUrl: f.mapUrl.trim() || `https://maps.google.com/?q=${encodeURIComponent((f.name || display) + ' Hanoi')}`,
+        mapUrl: f.mapUrl.trim() || poi?.mapUrl || `https://maps.google.com/?q=${encodeURIComponent((f.name || display) + ' Hanoi')}`,
         priceVndText: f.priceVndText.trim(), priceKrwText: '',
         priceVndAvg: Number((f.priceVndText.match(/[\d,]+/)?.[0] ?? '').replace(/,/g, '')) || 0,
         menu: f.menu.trim() || undefined,
         note: f.note.trim(), custom: true,
+        poi,
       });
     });
     onDone();
@@ -345,6 +379,9 @@ function AddPlaceForm({ projectId, onDone }: { projectId: string; onDone: () => 
     <div className="card space-y-2 p-3 text-xs">
       <input value={f.nameKo} onChange={set('nameKo')} placeholder="장소 이름 (한국어 표기 · 필수)" className={inp} />
       <input value={f.name} onChange={set('name')} placeholder="현지어·영문 표기 (지도 검색용)" className={inp} />
+      <input value={f.mapUrl} onChange={set('mapUrl')} placeholder="구글 지도 링크 붙여넣기 (선택)" className={inp} />
+      <PoiFetchButton busy={busy} error={error} onClick={fetchPoi} />
+      {poi && <PoiPanel poi={poi} />}
       <div className="grid grid-cols-2 gap-2">
         <input value={f.category} onChange={set('category')} placeholder="종류 (맛집·카페·관광 등)" className={inp} />
         <input value={f.area} onChange={set('area')} list="area-list" placeholder="지역·구역" className={inp} />
@@ -352,7 +389,6 @@ function AddPlaceForm({ projectId, onDone }: { projectId: string; onDone: () => 
       </div>
       <input value={f.priceVndText} onChange={set('priceVndText')} placeholder="예상 가격 (예: 1인 2만원, 180k VND)" className={inp} />
       <input value={f.menu} onChange={set('menu')} placeholder="추천 메뉴 · 볼거리" className={inp} />
-      <input value={f.mapUrl} onChange={set('mapUrl')} placeholder="구글 지도 링크 (비우면 자동 생성)" className={inp} />
       <input value={f.note} onChange={set('note')} placeholder="한 줄 소개 · 메모" className={inp} />
       <div className="flex justify-end gap-2 pt-1">
         <button onClick={onDone} className="px-3 py-1 text-slate-400">취소</button>
