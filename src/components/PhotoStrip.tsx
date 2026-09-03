@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { ImagePlus, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ImagePlus, X, Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { uploadPhoto, deletePhoto } from '../lib/photos';
 
-/** 타임라인·일기 공용 사진 첨부 스트립 + 전체보기 갤러리. */
+/** 타임라인·일기 공용 사진 첨부 스트립 + 전체보기 갤러리.
+ *  기본은 깔끔하게 — 사진을 길게 누르면 삭제·순서 변경 모드. */
 export default function PhotoStrip({
   photos = [],
   onChange,
@@ -17,8 +18,11 @@ export default function PhotoStrip({
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [idx, setIdx] = useState<number | null>(null); // 전체보기 중인 사진 index
+  const [idx, setIdx] = useState<number | null>(null); // 전체보기 중인 사진
+  const [editing, setEditing] = useState(false);
   const touchX = useRef(0);
+  const longTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longFired = useRef(false);
 
   const open = idx != null && photos[idx] != null ? idx : null;
   const go = (d: number) =>
@@ -51,32 +55,85 @@ export default function PhotoStrip({
   };
 
   const remove = async (url: string) => {
-    onChange(photos.filter((p) => p !== url));
+    const next = photos.filter((p) => p !== url);
+    onChange(next);
     deletePhoto(url);
+    if (next.length === 0) setEditing(false);
+  };
+  const move = (i: number, d: number) => {
+    const j = i + d;
+    if (j < 0 || j >= photos.length) return;
+    const next = [...photos];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+
+  const startLong = () => {
+    if (!editable) return;
+    longFired.current = false;
+    longTimer.current = setTimeout(() => {
+      longFired.current = true;
+      setEditing(true);
+      navigator.vibrate?.(10);
+    }, 450);
+  };
+  const cancelLong = () => {
+    if (longTimer.current) { clearTimeout(longTimer.current); longTimer.current = null; }
+  };
+  const openViewer = (i: number) => {
+    if (longFired.current) { longFired.current = false; return; } // 길게 누른 직후 클릭은 무시
+    setIdx(i);
   };
 
   if (!editable && photos.length === 0) return null;
 
   return (
     <div>
+      {editing && (
+        <div className="mb-1 flex items-center justify-between text-[10px] text-slate-500">
+          <span>길게 눌러 편집 중 · ◀▶ 순서, ✕ 삭제</span>
+          <button onClick={() => setEditing(false)} className="flex items-center gap-1 text-moose-heart">
+            <Check size={12} /> 완료
+          </button>
+        </div>
+      )}
+
       {/* 미리보기 — 여러 장이면 세로 스크롤 */}
       <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">
         {photos.map((url, i) => (
           <div key={url} className="relative h-16 w-16 overflow-hidden rounded-lg bg-moose-edge">
-            <button onClick={() => setIdx(i)} className="h-full w-full">
-              <img src={url} alt="" className="h-full w-full object-cover" />
+            <button
+              onClick={() => openViewer(i)}
+              onPointerDown={startLong}
+              onPointerUp={cancelLong}
+              onPointerLeave={cancelLong}
+              onPointerCancel={cancelLong}
+              onContextMenu={(e) => e.preventDefault()}
+              className="h-full w-full"
+            >
+              <img src={url} alt="" className="h-full w-full object-cover" draggable={false} />
             </button>
-            {editable && (
-              <button
-                onClick={() => remove(url)}
-                className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white"
-              >
-                <X size={11} />
-              </button>
+            {editable && editing && (
+              <>
+                <button
+                  onClick={() => remove(url)}
+                  className="absolute right-0.5 top-0.5 rounded-full bg-black/70 p-0.5 text-white"
+                >
+                  <X size={12} />
+                </button>
+                <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/55">
+                  <button onClick={() => move(i, -1)} disabled={i === 0} className="px-1 py-0.5 text-white disabled:opacity-25">
+                    <ChevronLeft size={13} />
+                  </button>
+                  <button onClick={() => move(i, 1)} disabled={i === photos.length - 1} className="px-1 py-0.5 text-white disabled:opacity-25">
+                    <ChevronRight size={13} />
+                  </button>
+                </div>
+              </>
             )}
           </div>
         ))}
-        {editable && photos.length < max && (
+        {editable && !editing && photos.length < max && (
           <button
             onClick={() => inputRef.current?.click()}
             disabled={busy}
@@ -107,8 +164,6 @@ export default function PhotoStrip({
             className="max-h-full max-w-full rounded-lg object-contain"
             onClick={(e) => e.stopPropagation()}
           />
-
-          {/* 순번 배지 */}
           <div className="absolute right-4 top-4 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
             {open + 1}/{photos.length}
           </div>
@@ -118,7 +173,6 @@ export default function PhotoStrip({
           >
             <X size={16} />
           </button>
-
           {photos.length > 1 && (
             <>
               <button

@@ -70,7 +70,7 @@ export default function MapView() {
   };
 
   return (
-    <div className="edge space-y-3 py-3">
+    <div className="edge flex h-full flex-col space-y-3 overflow-y-auto py-3">
       <div className="flex items-center gap-2">
         <div className="no-scrollbar flex flex-1 gap-1.5 overflow-x-auto pb-1">
           {Array.from({ length: days }, (_, i) => i + 1).map((d) => (

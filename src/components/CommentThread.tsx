@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
-import { Trash2, AtSign } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import type { EntryComment } from '../types';
-import { useMyName, useMemberNames } from '../lib/members';
+import { useMyName, useMentionNames } from '../lib/members';
 
-/** 타임라인·장소·맛집·숙소 상세 모달 공용 댓글 스레드 (모달 최하단). @멘션 지원. */
+/** 타임라인·장소·맛집·숙소 상세 모달 공용 댓글 스레드 (모달 최하단). 인스타식 @멘션. */
 export default function CommentThread({
   comments = [],
   onAdd,
@@ -14,31 +14,52 @@ export default function CommentThread({
   onDelete: (id: string) => void;
 }) {
   const me = useMyName();
-  const members = useMemberNames().filter((m) => m !== me);
+  const names = useMentionNames();
   const [text, setText] = useState('');
-  const [pick, setPick] = useState(false);
+  const [caret, setCaret] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // 커서 바로 앞의 "@단어" 조각 → 있으면 자동완성 목록 표시
+  const token = useMemo(() => {
+    const m = text.slice(0, caret).match(/(?:^|\s)@([^\s@]*)$/);
+    return m ? m[1] : null;
+  }, [text, caret]);
+  const suggest = useMemo(() => {
+    if (token == null) return [];
+    const q = token.toLowerCase();
+    return names.filter((n) => n.toLowerCase().includes(q)).slice(0, 6);
+  }, [token, names]);
+
   const mentioned = useMemo(
-    () => members.filter((m) => text.includes('@' + m)),
-    [text, members],
+    () => names.filter((n) => new RegExp(`(?:^|\\s)@${escapeRe(n)}(?=\\s|$)`).test(text)),
+    [text, names],
   );
+
+  const sync = (el: HTMLInputElement) => { setText(el.value); setCaret(el.selectionStart ?? el.value.length); };
+
+  const choose = (name: string) => {
+    const before = text.slice(0, caret).replace(/@([^\s@]*)$/, `@${name} `);
+    const next = before + text.slice(caret);
+    setText(next);
+    const pos = before.length;
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(pos, pos);
+      setCaret(pos);
+    });
+  };
 
   const submit = () => {
     const t = text.trim();
     if (!t) return;
     onAdd(t, mentioned);
     setText('');
-  };
-
-  const addMention = (name: string) => {
-    setText((t) => (t ? `${t.replace(/\s*$/, '')} @${name} ` : `@${name} `));
-    setPick(false);
-    inputRef.current?.focus();
+    setCaret(0);
   };
 
   const render = (c: EntryComment) => {
-    // @이름 강조
     const parts = c.text.split(/(@[^\s@]+)/g);
     return parts.map((p, i) =>
       p.startsWith('@') && (c.mentions ?? []).some((m) => p === '@' + m)
@@ -71,28 +92,37 @@ export default function CommentThread({
         </div>
       ))}
 
-      {pick && members.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {members.map((m) => (
-            <button key={m} onClick={() => addMention(m)} className="rounded-full bg-moose-heart/15 px-2.5 py-1 text-[11px] text-moose-heart">
-              @{m}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="flex gap-2">
-        {members.length > 0 && (
-          <button onClick={() => setPick((v) => !v)} className={`shrink-0 rounded-lg px-2 ${pick ? 'bg-moose-heart/20 text-moose-heart' : 'bg-moose-edge text-slate-400'}`}>
-            <AtSign size={15} />
-          </button>
+      <div className="relative flex gap-2">
+        {/* @자동완성 (인스타식) */}
+        {suggest.length > 0 && (
+          <div className="modal-surface absolute bottom-full left-0 z-30 mb-1 w-48 overflow-hidden rounded-xl">
+            {suggest.map((n) => (
+              <button
+                key={n}
+                onMouseDown={(e) => { e.preventDefault(); choose(n); }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-slate-100 hover:bg-white/5"
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-moose-heart/20 text-[12px] font-bold text-moose-heart">
+                  {n.slice(0, 1)}
+                </span>
+                {n}
+              </button>
+            ))}
+          </div>
         )}
         <input
           ref={inputRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
-          placeholder={members.length ? '코멘트 · @로 멘션' : '코멘트 남기기'}
+          onChange={(e) => sync(e.currentTarget)}
+          onKeyUp={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+          onClick={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            if (suggest.length > 0) choose(suggest[0]);
+            else submit();
+          }}
+          placeholder={names.length ? '코멘트 · @로 멘션' : '코멘트 남기기'}
           className="min-w-0 flex-1 rounded-lg bg-moose-edge px-3 py-2 text-sm text-slate-100 outline-none"
         />
         <button
@@ -106,3 +136,5 @@ export default function CommentThread({
     </div>
   );
 }
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

@@ -105,6 +105,7 @@ function Chat() {
   const myAvatar = profile.avatarDataUrl || cloudUser?.avatar;
 
   const [uploading, setUploading] = useState(false);
+  const [dirty, setDirty] = useState(false); // 프로필 텍스트 미저장 여부 (불필요한 동기화 방지)
 
   /** 내 프로필 스냅샷을 채팅방(TripDoc)에 반영 — 동행자에게도 동기화됨.
    *  이름을 바꿨으면 이전 이름(카톡 기본 등)으로 저장된 스냅샷은 정리. */
@@ -197,8 +198,7 @@ function Chat() {
           </button>
           <input
             value={profile.displayName}
-            onChange={(e) => setProfile({ displayName: e.target.value })}
-            onBlur={() => syncMe()}
+            onChange={(e) => { setProfile({ displayName: e.target.value }); setDirty(true); }}
             placeholder="프로필명"
             className="flex-1 bg-transparent text-sm font-semibold text-white outline-none"
           />
@@ -217,11 +217,18 @@ function Chat() {
         )}
         <input
           value={profile.statusMessage ?? ''}
-          onChange={(e) => setProfile({ statusMessage: e.target.value })}
-          onBlur={() => syncMe()}
+          onChange={(e) => { setProfile({ statusMessage: e.target.value }); setDirty(true); }}
           placeholder="상태 메시지"
           className="w-full bg-transparent text-[12px] text-slate-300 outline-none"
         />
+        {dirty && (
+          <button
+            onClick={() => { syncMe(); setDirty(false); }}
+            className="btn-heart w-full rounded-lg py-1.5 text-xs font-semibold"
+          >
+            프로필 저장
+          </button>
+        )}
         <input ref={avatarInput} type="file" accept="image/*" hidden onChange={pickImage('avatarDataUrl')} />
         <input ref={bgInput} type="file" accept="image/*" hidden onChange={pickImage('chatBgDataUrl')} />
       </div>

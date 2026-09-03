@@ -177,19 +177,8 @@ export default function TimelineView() {
   }, [focus.focusId]);
 
   return (
-    <div className="edge space-y-4 py-3">
-      <div className="flex items-center justify-between rounded-lg bg-moose-dusk/70 px-3 py-2 text-[11px] text-slate-400">
-        <span>
-          현지(하노이) <span className="text-slate-200">{focus.localHHMM}</span>
-          {focus.deviceHHMM !== focus.localHHMM && <> · 내 기기 {focus.deviceHHMM}</>}
-          {' · '}
-          {focus.inTrip ? `여행 ${focus.day}일차 진행 중` : focus.day === 1 ? '여행 시작 전' : '여행 종료'}
-        </span>
-        <button onClick={() => setPicker(true)} className="flex shrink-0 items-center gap-1 text-moose-heart">
-          <Sparkles size={12} /> 추천 스팟
-        </button>
-      </div>
-
+    <div className="flex h-full flex-col">
+      <div className="edge min-h-0 flex-1 space-y-4 overflow-y-auto py-3">
       <div className="flex items-center justify-between rounded-lg bg-moose-dusk/50 px-2 py-1.5">
         <div className="flex gap-1 text-[11px]">
           <button
@@ -302,6 +291,22 @@ export default function TimelineView() {
 
       {/* 오늘 한 줄 — 저녁(20시 이후) 화면 맨 아래에 */}
       {new Date().getHours() >= 20 && <DiaryQuickWrite />}
+      </div>
+
+      {/* 하단 고정: 현지 시간 · 추천 스팟 */}
+      <div className="edge shrink-0 border-t border-moose-edge bg-moose-night/95 py-1.5 backdrop-blur">
+        <div className="flex items-center justify-between rounded-lg bg-moose-dusk/70 px-3 py-2 text-[11px] text-slate-400">
+          <span>
+            현지(하노이) <span className="text-slate-200">{focus.localHHMM}</span>
+            {focus.deviceHHMM !== focus.localHHMM && <> · 내 기기 {focus.deviceHHMM}</>}
+            {' · '}
+            {focus.inTrip ? `여행 ${focus.day}일차 진행 중` : focus.day === 1 ? '여행 시작 전' : '여행 종료'}
+          </span>
+          <button onClick={() => setPicker(true)} className="flex shrink-0 items-center gap-1 text-moose-heart">
+            <Sparkles size={12} /> 추천 스팟
+          </button>
+        </div>
+      </div>
 
       {detailId && byId[detailId] && (
         <ItemDetailModal item={byId[detailId]} onClose={() => setDetailId(null)} />
