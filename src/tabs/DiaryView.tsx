@@ -21,7 +21,7 @@ const fmtDate = (d: string) => {
   return `${dt.getMonth() + 1}월 ${dt.getDate()}일 (${'일월화수목금토'[dt.getDay()]})`;
 };
 
-function useDiary() {
+export function useDiary() {
   const project = useActiveProject()!;
   const author = useMyName();
   const mutate = useAppStore((s) => s.mutate);

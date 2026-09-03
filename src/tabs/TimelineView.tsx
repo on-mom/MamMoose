@@ -8,7 +8,7 @@ import {
   SortableContext, useSortable, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Plus, Trash2, Clock, MapPin, Sparkles, Heart, MessageCircle, Lock, Pencil, Navigation } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Clock, MapPin, Sparkles, Heart, MessageCircle, Lock, Pencil, Navigation, Check } from 'lucide-react';
 import type { TimelineItem } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
@@ -25,7 +25,7 @@ import Modal from '../components/Modal';
 import { PlaceFilterControls, applyPlaceFilter, emptyFilterState, type PlaceFilterState } from '../components/PlaceFilter';
 import CommentThread from '../components/CommentThread';
 import PhotoStrip from '../components/PhotoStrip';
-import { DiaryQuickWrite } from './DiaryView';
+import { DiaryQuickWrite, useDiary, MOODS } from './DiaryView';
 
 const COL = 'col-'; // droppable 접두사
 const dayKeys = (n: number) => Array.from({ length: n }, (_, i) => String(i + 1));
@@ -64,6 +64,12 @@ export default function TimelineView() {
   const [pickFilter, setPickFilter] = useState<PlaceFilterState>(emptyFilterState);
   const [mode, setMode] = useState<'read' | 'edit'>('read');
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [reviewFor, setReviewFor] = useState<TimelineItem | null>(null);
+
+  const toggleDone = (it: TimelineItem, done: boolean) => {
+    mutate((doc) => { const t = doc.timeline.find((x) => x.id === it.id); if (t) t.done = done; });
+    if (done) setReviewFor(it); // 마쳤으면 "어땠어요?" 회고 창
+  };
 
   const byId = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items]);
   const [board, setBoard] = useState<Board>(() => boardFromItems(items, days));
@@ -247,6 +253,7 @@ export default function TimelineView() {
               focusId={focus.focusId}
               focusRef={focusRef}
               onOpen={setDetailId}
+              onToggleDone={toggleDone}
             />
           ))}
         </div>
@@ -311,7 +318,66 @@ export default function TimelineView() {
       {detailId && byId[detailId] && (
         <ItemDetailModal item={byId[detailId]} onClose={() => setDetailId(null)} />
       )}
+      {reviewFor && (
+        <ReviewModal
+          item={reviewFor}
+          date={isoOfDay(project.startDate, reviewFor.day)}
+          onClose={() => setReviewFor(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/* ---------- 일정 완료 회고 → 일기로 저장 ---------- */
+function ReviewModal({ item, date, onClose }: { item: TimelineItem; date: string; onClose: () => void }) {
+  const { add } = useDiary();
+  const [text, setText] = useState('');
+  const [mood, setMood] = useState('');
+
+  const save = () => {
+    if (text.trim() || mood) {
+      add(text.trim() ? `${item.place} — ${text.trim()}` : `${item.place} 다녀왔어요`, mood || undefined, undefined, date);
+    }
+    onClose();
+  };
+
+  return (
+    <Modal
+      onClose={onClose}
+      title={<span className="text-sm font-semibold text-white">{item.place} 어땠어요?</span>}
+      footer={
+        <div className="flex gap-2">
+          <button onClick={onClose} className="rounded-xl px-3 py-2.5 text-sm text-slate-400">나중에</button>
+          <button onClick={save} className="btn-heart flex-1 rounded-xl py-2.5 text-sm font-semibold">일기에 남기기</button>
+        </div>
+      }
+    >
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-1">
+          {MOODS.map((m) => (
+            <button
+              key={m}
+              onClick={() => setMood(mood === m ? '' : m)}
+              className={`rounded-md px-1.5 py-0.5 text-lg transition ${mood === m ? 'bg-moose-heart/25' : 'opacity-45 hover:opacity-100'}`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={3}
+          autoFocus
+          placeholder="ex) 웨이팅 길었지만 쌀국수 최고였어 🍜"
+          className="w-full resize-none rounded-lg bg-moose-edge px-3 py-2 text-sm text-slate-100 outline-none"
+        />
+        <p className="text-[10px] text-slate-600">
+          {new Date(date + 'T00:00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })} 일기로 저장돼요 · MY › 일기에서 모아볼 수 있어요
+        </p>
+      </div>
+    </Modal>
   );
 }
 
@@ -350,13 +416,14 @@ function Row({
 
 /* ---------- 읽기전용: 하루 ---------- */
 function ReadDay({
-  label, items, focusId, focusRef, onOpen,
+  label, items, focusId, focusRef, onOpen, onToggleDone,
 }: {
   label: React.ReactNode;
   items: TimelineItem[];
   focusId?: string | null;
   focusRef: Ref<HTMLDivElement>;
   onOpen: (id: string) => void;
+  onToggleDone: (it: TimelineItem, done: boolean) => void;
 }) {
   const warns = useDayTransit(items);
   return (
@@ -374,6 +441,7 @@ function ReadDay({
             highlight={it.id === focusId}
             innerRef={it.id === focusId ? focusRef : undefined}
             onOpen={() => onOpen(it.id)}
+            onToggleDone={(done) => onToggleDone(it, done)}
           />
           {warns[it.id] && (
             <div className="mt-1 flex items-center gap-1 pl-1 text-[10px] text-amber-400">
@@ -389,22 +457,23 @@ function ReadDay({
 
 /* ---------- 읽기전용 카드 ---------- */
 function ReadCard({
-  item, highlight, innerRef, onOpen,
-}: { item: TimelineItem; highlight?: boolean; innerRef?: Ref<HTMLDivElement>; onOpen: () => void }) {
+  item, highlight, innerRef, onOpen, onToggleDone,
+}: { item: TimelineItem; highlight?: boolean; innerRef?: Ref<HTMLDivElement>; onOpen: () => void; onToggleDone: (done: boolean) => void }) {
   const likes = item.likes ?? [];
   const comments = item.comments ?? [];
   const photos = item.photos ?? [];
+  const done = !!item.done;
   return (
-    <div ref={innerRef}>
+    <div ref={innerRef} className="relative">
       <button
         onClick={onOpen}
-        className={`w-full rounded-xl border p-2.5 text-left transition ${
+        className={`w-full rounded-xl border p-2.5 pr-10 text-left transition ${
           highlight ? 'border-moose-heart bg-moose-heart/10' : 'border-white/5 bg-moose-dusk/70 hover:bg-white/[0.05]'
-        }`}
+        } ${done ? 'opacity-55' : ''}`}
       >
         <div className="flex items-center gap-2">
           <span className="text-[11px] tabular-nums text-slate-400">{item.startTime}</span>
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{item.place}</span>
+          <span className={`min-w-0 flex-1 truncate text-sm font-semibold text-white ${done ? 'line-through decoration-slate-500' : ''}`}>{item.place}</span>
           {item.lat != null && <MapPin size={11} className="shrink-0 text-emerald-500" />}
         </div>
         {item.memo && <div className="mt-1 truncate text-[11px] text-slate-400">{item.memo}</div>}
@@ -430,6 +499,15 @@ function ReadCard({
             )}
           </div>
         )}
+      </button>
+      <button
+        onClick={() => onToggleDone(!done)}
+        aria-label={done ? '완료 취소' : '이 일정 마침'}
+        className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md border transition ${
+          done ? 'border-moose-heart bg-moose-heart text-white' : 'border-white/25 text-transparent hover:border-white/50'
+        }`}
+      >
+        <Check size={14} />
       </button>
     </div>
   );

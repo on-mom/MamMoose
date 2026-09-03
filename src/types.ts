@@ -58,6 +58,8 @@ export interface TimelineItem {
   comments?: TimelineComment[];
   /** 첨부 사진 (Supabase Storage URL 또는 압축 data URL) */
   photos?: string[];
+  /** 이 일정을 마쳤는지 (읽기 모드에서 체크) */
+  done?: boolean;
 }
 
 /** 참여자 댓글 — 타임라인·장소·맛집·숙소 모달 공용 */
