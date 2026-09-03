@@ -67,6 +67,7 @@ interface AppState {
   setActiveProject: (id: string) => void;
   addProject: (p: Omit<Project, 'id'>) => string;
   patchProject: (id: string, patch: Partial<Project>) => void;
+  removeProject: (id: string) => void;
 
   // --- Undo/Redo 히스토리 스택 (여행 문서 전체 스냅샷) ---
   past: Docs[];
@@ -155,6 +156,15 @@ export const useAppStore = create<AppState>()(
         set((s) => ({
           projects: s.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)),
         })),
+      removeProject: (id) =>
+        set((s) => {
+          if (s.projects.length <= 1) return s; // 마지막 1개는 삭제 불가
+          const projects = s.projects.filter((p) => p.id !== id);
+          const present = { ...s.present };
+          delete present[id];
+          const activeProjectId = s.activeProjectId === id ? projects[0].id : s.activeProjectId;
+          return { projects, present, activeProjectId, past: [], future: [] };
+        }),
 
       past: [],
       present: { [SEED_PROJECT.id]: seededDoc(SEED_PROJECT.id) },

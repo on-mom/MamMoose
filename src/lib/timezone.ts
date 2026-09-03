@@ -1,9 +1,22 @@
 import type { Project, TimelineItem } from '../types';
 
+const DEFAULT_TZ = 'Asia/Ho_Chi_Minh';
+
+/** 유효하지 않은 타임존이면 기본값으로 대체 (잘못된 값이 앱을 죽이지 않도록) */
+export function safeTz(tz?: string): string {
+  if (!tz) return DEFAULT_TZ;
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: tz });
+    return tz;
+  } catch {
+    return DEFAULT_TZ;
+  }
+}
+
 /** 특정 IANA 타임존 기준의 벽시계 시각 (분 단위, 자정=0) + YYYY-MM-DD */
 export function wallClock(tz: string, now: Date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz,
+    timeZone: safeTz(tz),
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).formatToParts(now);
@@ -31,7 +44,8 @@ const daysBetween = (a: string, b: string) =>
  * - 여행 후: 마지막 일차 마지막 항목
  */
 export function computeFocus(project: Project, items: TimelineItem[], now: Date = new Date()) {
-  const local = wallClock(project.timezone, now);
+  const tz = safeTz(project.timezone);
+  const local = wallClock(tz, now);
   const device = wallClock(Intl.DateTimeFormat().resolvedOptions().timeZone, now);
   const totalDays = Math.max(1, daysBetween(project.startDate, project.endDate) + 1);
   const dayOffset = daysBetween(project.startDate, local.date);
@@ -59,7 +73,7 @@ export function computeFocus(project: Project, items: TimelineItem[], now: Date 
     inTrip,
     localHHMM: local.hhmm,
     deviceHHMM: device.hhmm,
-    localTz: project.timezone,
-    deviceTz: device === local ? project.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone,
+    localTz: tz,
+    deviceTz: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 }

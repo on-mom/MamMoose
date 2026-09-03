@@ -1,12 +1,17 @@
 import { useRef, useState } from 'react';
-import { Check, LogOut, Plus, Send, Camera, Image as ImageIcon, UserPlus, Copy, AlertTriangle } from 'lucide-react';
+import {
+  Check, LogOut, Plus, Send, Camera, Image as ImageIcon, UserPlus, Copy, AlertTriangle,
+  MoreVertical, Pencil, Trash2,
+} from 'lucide-react';
+import type { Project } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { cloudEnabled, signOut } from '../lib/supabase';
-import { createInvite, acceptInvite } from '../store/cloudSync';
+import { createInvite, acceptInvite, deleteCloudTrip } from '../store/cloudSync';
 import { Moose } from '../components/Moose';
 import Modal from '../components/Modal';
-import { outboundText, inboundText } from '../lib/flight';
+import { outboundText, inboundText, carrierOf } from '../lib/flight';
+import { CITY_TZ } from '../lib/cities';
 
 type Sub = 'chat' | 'trips' | 'settings';
 const hhmm = (ts: number) =>
@@ -142,13 +147,27 @@ function Chat() {
   );
 }
 
+type FlightForm = { date: string; flightNo: string; carrier: string; depAirport: string; depTime: string; arrAirport: string; arrTime: string };
+type TripFormData = {
+  name: string; destination: string; startDate: string; endDate: string; timezone: string;
+  outbound: FlightForm; inbound: FlightForm;
+};
+const BLANK_FLIGHT: FlightForm = { date: '', flightNo: '', carrier: '', depAirport: '', depTime: '', arrAirport: '', arrTime: '' };
+const hasFlight = (fl: FlightForm) => fl.flightNo || fl.depAirport || fl.date;
+
 function Trips() {
   const projects = useAppStore((s) => s.projects);
   const activeId = useAppStore((s) => s.activeProjectId);
   const setActive = useAppStore((s) => s.setActiveProject);
   const addProject = useAppStore((s) => s.addProject);
+  const patchProject = useAppStore((s) => s.patchProject);
+  const removeProject = useAppStore((s) => s.removeProject);
   const cloudUser = useAppStore((s) => s.cloudUser);
+
   const [adding, setAdding] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [delTarget, setDelTarget] = useState<Project | null>(null);
   const [modal, setModal] = useState<{ tripName: string; code?: string; error?: string; loading?: boolean } | null>(null);
   const [joinCode, setJoinCode] = useState('');
   const [joinMsg, setJoinMsg] = useState('');
@@ -173,57 +192,87 @@ function Trips() {
     if (r.ok) setJoinCode('');
   };
 
-  const blankFlight = { date: '', flightNo: '', depAirport: '', depTime: '', arrAirport: '', arrTime: '' };
-  const [f, setF] = useState({
-    name: '', destination: '', startDate: '', endDate: '', timezone: 'Asia/Ho_Chi_Minh',
-    outbound: { ...blankFlight }, inbound: { ...blankFlight },
-  });
-  const setFlight = (leg: 'outbound' | 'inbound', k: keyof typeof blankFlight) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [leg]: { ...p[leg], [k]: e.target.value } }));
-  const hasFlight = (fl: typeof blankFlight) => fl.flightNo || fl.depAirport || fl.date;
+  const toFlight = (fl: FlightForm, fallbackDate: string): import('../types').Flight | undefined =>
+    hasFlight(fl)
+      ? { ...fl, date: fl.date || fallbackDate, carrier: fl.carrier || carrierOf(fl.flightNo) || undefined }
+      : undefined;
 
-  const submit = () => {
-    if (!f.name.trim() || !f.startDate || !f.endDate) return;
+  const saveNew = (d: TripFormData) => {
     const id = addProject({
-      name: f.name.trim(), destination: f.destination.trim(),
-      startDate: f.startDate, endDate: f.endDate, timezone: f.timezone,
-      outbound: hasFlight(f.outbound) ? { ...f.outbound, date: f.outbound.date || f.startDate } : undefined,
-      inbound: hasFlight(f.inbound) ? { ...f.inbound, date: f.inbound.date || f.endDate } : undefined,
+      name: d.name.trim(), destination: d.destination.trim(),
+      startDate: d.startDate, endDate: d.endDate, timezone: d.timezone,
+      outbound: toFlight(d.outbound, d.startDate), inbound: toFlight(d.inbound, d.endDate),
     });
     setActive(id);
     setAdding(false);
-    setF({ name: '', destination: '', startDate: '', endDate: '', timezone: 'Asia/Ho_Chi_Minh', outbound: { ...blankFlight }, inbound: { ...blankFlight } });
+  };
+  const saveEdit = (id: string, d: TripFormData) => {
+    patchProject(id, {
+      name: d.name.trim(), destination: d.destination.trim(),
+      startDate: d.startDate, endDate: d.endDate, timezone: d.timezone,
+      outbound: toFlight(d.outbound, d.startDate), inbound: toFlight(d.inbound, d.endDate),
+    });
+    setEditId(null);
+  };
+  const confirmDelete = () => {
+    if (!delTarget) return;
+    if (cloudUser) deleteCloudTrip(delTarget.id);
+    removeProject(delTarget.id);
+    setDelTarget(null);
   };
 
   return (
-    <div className="space-y-2 overflow-y-auto">
-      {projects.map((p) => (
-        <div
-          key={p.id}
-          className={`rounded-xl border p-3 ${
-            p.id === activeId ? 'border-moose-heart bg-rose-950/20' : 'border-moose-edge bg-moose-dusk/70'
-          }`}
-        >
-          <button onClick={() => setActive(p.id)} className="flex w-full items-center justify-between text-left">
-            <div className="min-w-0">
-              <div className="font-title text-sm font-bold text-white">{p.name}</div>
-              <div className="truncate text-[11px] text-slate-400">
-                {p.destination} · {p.startDate}~{p.endDate}
-              </div>
-              {outboundText(p) && <div className="truncate text-[10px] text-slate-500">✈ {outboundText(p)}</div>}
-              {inboundText(p) && <div className="truncate text-[10px] text-slate-500">✈ {inboundText(p)}</div>}
-            </div>
-            {p.id === activeId && <Check size={16} className="shrink-0 text-moose-heart" />}
-          </button>
-          {cloudUser && (
-            <div className="mt-2 border-t border-moose-edge pt-2">
-              <button onClick={() => makeInvite(p.id, p.name)} className="flex items-center gap-1 text-xs text-moose-heart">
-                <UserPlus size={13} /> 동행자 초대
+    <div className="space-y-2 overflow-y-auto" onClick={() => setMenuId(null)}>
+      {projects.map((p) =>
+        editId === p.id ? (
+          <TripForm key={p.id} initial={p} onSubmit={(d) => saveEdit(p.id, d)} onCancel={() => setEditId(null)} />
+        ) : (
+          <div
+            key={p.id}
+            className={`relative rounded-xl border p-3 ${
+              p.id === activeId ? 'border-moose-heart bg-moose-heart/10' : 'border-white/5 bg-moose-dusk/70'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <button onClick={() => setActive(p.id)} className="min-w-0 flex-1 text-left">
+                <div className="flex items-center gap-1.5">
+                  <div className="font-title truncate text-sm font-bold text-white">{p.name}</div>
+                  {p.id === activeId && <Check size={14} className="shrink-0 text-moose-heart" />}
+                </div>
+                <div className="truncate text-[11px] text-slate-400">{p.destination} · {p.startDate}~{p.endDate}</div>
+                {outboundText(p) && <div className="truncate text-[10px] text-slate-500">✈ {outboundText(p)}</div>}
+                {inboundText(p) && <div className="truncate text-[10px] text-slate-500">✈ {inboundText(p)}</div>}
               </button>
+              <div className="relative shrink-0">
+                <button onClick={(e) => { e.stopPropagation(); setMenuId(menuId === p.id ? null : p.id); }} className="p-1 text-slate-500">
+                  <MoreVertical size={15} />
+                </button>
+                {menuId === p.id && (
+                  <div className="modal-surface absolute right-0 z-20 mt-1 w-24 rounded-lg p-1 text-xs" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => { setEditId(p.id); setMenuId(null); }} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-slate-200 hover:bg-white/5">
+                      <Pencil size={12} /> 수정
+                    </button>
+                    <button
+                      onClick={() => { setDelTarget(p); setMenuId(null); }}
+                      disabled={projects.length <= 1}
+                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-rose-400 hover:bg-white/5 disabled:opacity-30"
+                    >
+                      <Trash2 size={12} /> 삭제
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </div>
-      ))}
+            {cloudUser && (
+              <div className="mt-2 border-t border-white/5 pt-2">
+                <button onClick={() => makeInvite(p.id, p.name)} className="flex items-center gap-1 text-xs text-moose-heart">
+                  <UserPlus size={13} /> 동행자 초대
+                </button>
+              </div>
+            )}
+          </div>
+        ),
+      )}
 
       {cloudUser && (
         <div className="flex gap-2 card border-0 p-2 text-xs">
@@ -233,60 +282,33 @@ function Trips() {
             placeholder="초대 코드 입력"
             className="flex-1 rounded bg-moose-edge px-2 py-1.5 font-mono tracking-widest text-slate-100 outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-slate-600"
           />
-          <button onClick={join} className="rounded bg-moose-heart px-3 font-semibold text-white">참여</button>
+          <button onClick={join} className="btn-heart rounded-lg px-3 font-semibold">참여</button>
         </div>
       )}
       {joinMsg && <p className="text-center text-[11px] text-moose-heart">{joinMsg}</p>}
 
       {adding ? (
-        <div className="space-y-2 card border-0 p-3 text-xs">
-          <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="여행 이름 *"
-            className="w-full rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
-          <input value={f.destination} onChange={(e) => setF({ ...f, destination: e.target.value })} placeholder="목적지"
-            className="w-full rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
-          <div className="flex gap-2">
-            <input type="date" value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })}
-              className="flex-1 rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
-            <input type="date" value={f.endDate} onChange={(e) => setF({ ...f, endDate: e.target.value })}
-              className="flex-1 rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
-          </div>
-          <input value={f.timezone} onChange={(e) => setF({ ...f, timezone: e.target.value })} placeholder="타임존 (IANA)"
-            className="w-full rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
-
-          {(['outbound', 'inbound'] as const).map((leg) => (
-            <div key={leg} className="space-y-1.5 rounded-lg bg-white/[0.03] p-2">
-              <div className="text-[10px] font-semibold text-slate-500">{leg === 'outbound' ? '✈ 출국편' : '✈ 귀국편'}</div>
-              <div className="flex gap-1.5">
-                <input type="date" value={f[leg].date} onChange={setFlight(leg, 'date')}
-                  className="min-w-0 flex-1 rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
-                <input value={f[leg].flightNo} onChange={setFlight(leg, 'flightNo')} placeholder="편명"
-                  className="w-20 rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
-              </div>
-              <div className="flex items-center gap-1.5">
-                <input value={f[leg].depAirport} onChange={setFlight(leg, 'depAirport')} placeholder="ICN" maxLength={4}
-                  className="w-14 rounded bg-moose-edge px-2 py-1.5 uppercase text-slate-100 outline-none" />
-                <input type="time" value={f[leg].depTime} onChange={setFlight(leg, 'depTime')}
-                  className="min-w-0 flex-1 rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
-                <span className="text-slate-600">→</span>
-                <input value={f[leg].arrAirport} onChange={setFlight(leg, 'arrAirport')} placeholder="HAN" maxLength={4}
-                  className="w-14 rounded bg-moose-edge px-2 py-1.5 uppercase text-slate-100 outline-none" />
-                <input type="time" value={f[leg].arrTime} onChange={setFlight(leg, 'arrTime')}
-                  className="min-w-0 flex-1 rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
-              </div>
-            </div>
-          ))}
-          <div className="flex justify-end gap-2 pt-1">
-            <button onClick={() => setAdding(false)} className="px-3 py-1 text-slate-400">취소</button>
-            <button onClick={submit} className="rounded btn-heart rounded-xl px-3 py-1 font-semibold">추가</button>
-          </div>
-        </div>
+        <TripForm onSubmit={saveNew} onCancel={() => setAdding(false)} />
       ) : (
         <button onClick={() => setAdding(true)}
-          className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-slate-700 py-3 text-xs text-slate-400">
+          className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-white/10 py-3 text-xs text-slate-400">
           <Plus size={14} /> 여행 프로젝트 추가
         </button>
       )}
       <p className="pt-1 text-center text-[10px] text-slate-600">여행을 선택하면 일정·맛집·Todo·가계부가 해당 여행 데이터로 전환됩니다</p>
+
+      {delTarget && (
+        <Modal onClose={() => setDelTarget(null)} title={<span className="text-sm font-semibold text-white">여행 삭제</span>}
+          footer={
+            <div className="flex gap-2">
+              <button onClick={() => setDelTarget(null)} className="flex-1 rounded-xl border border-white/10 py-2 text-sm text-slate-300">취소</button>
+              <button onClick={confirmDelete} className="flex-1 rounded-xl bg-rose-500 py-2 text-sm font-semibold text-white">삭제</button>
+            </div>
+          }>
+          <p className="text-sm text-slate-300"><b className="text-white">{delTarget.name}</b> 여행과 그 안의 일정·맛집·Todo·가계부·채팅이 모두 삭제됩니다. 되돌릴 수 없어요.</p>
+          {cloudUser && <p className="mt-2 text-[11px] text-slate-500">클라우드에서도 삭제되며, 동행자 화면에서도 사라집니다.</p>}
+        </Modal>
+      )}
 
       {modal && (
         <Modal
@@ -326,6 +348,83 @@ function Trips() {
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+/* ---------- 여행 추가/수정 폼 ---------- */
+function toForm(p?: Project): TripFormData {
+  const fl = (x?: import('../types').Flight): FlightForm => ({ ...BLANK_FLIGHT, ...(x ?? {}), carrier: x?.carrier ?? '' });
+  return {
+    name: p?.name ?? '', destination: p?.destination ?? '',
+    startDate: p?.startDate ?? '', endDate: p?.endDate ?? '',
+    timezone: p?.timezone ?? 'Asia/Ho_Chi_Minh',
+    outbound: fl(p?.outbound), inbound: fl(p?.inbound),
+  };
+}
+
+function TripForm({ initial, onSubmit, onCancel }: {
+  initial?: Project;
+  onSubmit: (d: TripFormData) => void;
+  onCancel: () => void;
+}) {
+  const [d, setD] = useState<TripFormData>(() => toForm(initial));
+  const inp = 'rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none';
+  const setLeg = (leg: 'outbound' | 'inbound', k: keyof FlightForm, v: string) =>
+    setD((p) => ({ ...p, [leg]: { ...p[leg], [k]: v } }));
+  const valid = d.name.trim() && d.startDate && d.endDate;
+
+  return (
+    <div className="space-y-2 card border-0 p-3 text-xs">
+      <input value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} placeholder="여행 이름 *" className={`w-full ${inp}`} />
+      <input value={d.destination} onChange={(e) => setD({ ...d, destination: e.target.value })} placeholder="목적지 (예: 베트남 하노이)" className={`w-full ${inp}`} />
+      <div className="flex gap-2">
+        <input type="date" value={d.startDate} onChange={(e) => setD({ ...d, startDate: e.target.value })} className={`flex-1 ${inp}`} />
+        <input type="date" value={d.endDate} onChange={(e) => setD({ ...d, endDate: e.target.value })} className={`flex-1 ${inp}`} />
+      </div>
+      <label className="block">
+        <span className="text-[10px] text-slate-500">현지 시간대 (여행지)</span>
+        <select value={d.timezone} onChange={(e) => setD({ ...d, timezone: e.target.value })} className={`mt-0.5 w-full ${inp}`}>
+          {CITY_TZ.map((c) => <option key={c.tz} value={c.tz}>{c.label}</option>)}
+        </select>
+      </label>
+
+      {(['outbound', 'inbound'] as const).map((leg) => {
+        const f = d[leg];
+        const auto = carrierOf(f.flightNo);
+        return (
+          <div key={leg} className="space-y-1.5 rounded-lg bg-white/[0.03] p-2">
+            <div className="text-[10px] font-semibold text-slate-500">{leg === 'outbound' ? '✈ 출국편' : '✈ 귀국편'}</div>
+            <div className="flex gap-1.5">
+              <input type="date" value={f.date} onChange={(e) => setLeg(leg, 'date', e.target.value)} className={`min-w-0 flex-1 ${inp}`} />
+              <input
+                value={f.flightNo}
+                onChange={(e) => setLeg(leg, 'flightNo', e.target.value)}
+                placeholder="편명 VJ961" className={`w-24 ${inp}`}
+              />
+            </div>
+            <input
+              value={f.carrier || auto}
+              onChange={(e) => setLeg(leg, 'carrier', e.target.value)}
+              placeholder="항공사 (편명 입력 시 자동)"
+              className={`w-full ${inp} ${!f.carrier && auto ? 'text-emerald-400' : ''}`}
+            />
+            <div className="flex items-center gap-1.5">
+              <input value={f.depAirport} onChange={(e) => setLeg(leg, 'depAirport', e.target.value.toUpperCase())} placeholder="ICN" maxLength={4} className={`w-14 uppercase ${inp}`} />
+              <input type="time" value={f.depTime} onChange={(e) => setLeg(leg, 'depTime', e.target.value)} className={`min-w-0 flex-1 ${inp}`} />
+              <span className="text-slate-600">→</span>
+              <input value={f.arrAirport} onChange={(e) => setLeg(leg, 'arrAirport', e.target.value.toUpperCase())} placeholder="HAN" maxLength={4} className={`w-14 uppercase ${inp}`} />
+              <input type="time" value={f.arrTime} onChange={(e) => setLeg(leg, 'arrTime', e.target.value)} className={`min-w-0 flex-1 ${inp}`} />
+            </div>
+          </div>
+        );
+      })}
+      <div className="flex justify-end gap-2 pt-1">
+        <button onClick={onCancel} className="px-3 py-1 text-slate-400">취소</button>
+        <button onClick={() => valid && onSubmit(d)} disabled={!valid} className="btn-heart rounded-xl px-4 py-1.5 font-semibold disabled:opacity-40">
+          {initial ? '저장' : '추가'}
+        </button>
+      </div>
     </div>
   );
 }

@@ -14,6 +14,11 @@ export const AREA_COORDS: Record<string, { lat: number; lng: number }> = {
   항카이: { lat: 21.0270, lng: 105.8490 },
   '성요셉 근처': { lat: 21.0290, lng: 105.8490 },
   '전역 체인': { lat: 21.0300, lng: 105.8400 },
+  롱비엔: { lat: 21.0490, lng: 105.8880 },
+  하동: { lat: 20.9720, lng: 105.7780 },
+  탄쑤언: { lat: 21.0010, lng: 105.8130 },
+  남뜨리엠: { lat: 21.0180, lng: 105.7640 },
+  안카인: { lat: 21.0090, lng: 105.7360 },
 };
 
 const HANOI_CENTER = { lat: 21.0285, lng: 105.8542 };

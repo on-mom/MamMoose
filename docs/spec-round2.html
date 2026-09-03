@@ -1,0 +1,270 @@
+<title>맘무스 2차 개발 기획서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+
+<style>
+  :root{
+    --ground:#faf7f8; --surface:#fff; --surface-2:#f5eef1; --ink:#241f26; --ink-soft:#6c6472;
+    --ink-faint:#948a99; --border:#e9e1e5; --border-strong:#dacdd3;
+    --accent:#c4437f; --accent-fill:#e2679f;
+    --ok:#2c9c6d; --warn:#c98a1e; --miss:#c65454; --info:#4a7bd0;
+    --shadow:0 1px 2px rgba(36,31,38,.05), 0 10px 30px -14px rgba(36,31,38,.14);
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+    --ground:#161319; --surface:#201c25; --surface-2:#29232f; --ink:#ece7ee; --ink-soft:#a99fb3;
+    --ink-faint:#7c7286; --border:#342d3c; --border-strong:#463d50;
+    --accent:#f472b6; --accent-fill:#f472b6;
+    --ok:#48c48d; --warn:#e6b366; --miss:#e88686; --info:#8fb2ee;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 34px -16px rgba(0,0,0,.6);
+  }}
+  :root[data-theme="dark"]{
+    --ground:#161319; --surface:#201c25; --surface-2:#29232f; --ink:#ece7ee; --ink-soft:#a99fb3;
+    --ink-faint:#7c7286; --border:#342d3c; --border-strong:#463d50;
+    --accent:#f472b6; --accent-fill:#f472b6;
+    --ok:#48c48d; --warn:#e6b366; --miss:#e88686; --info:#8fb2ee;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 34px -16px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box}
+  html{overflow-x:hidden}
+  body{margin:0;background:var(--ground);color:var(--ink);overflow-x:hidden;
+    font-family:"Noto Sans KR",system-ui,sans-serif;font-size:15px;line-height:1.72;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,h4{font-family:"IBM Plex Sans KR","Noto Sans KR",sans-serif;text-wrap:balance}
+  code,.mono{font-family:"IBM Plex Mono",monospace;font-size:.88em}
+  .wrap{max-width:760px;margin:0 auto;padding:40px 22px 100px}
+  header.top{border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--ground) 90%,transparent);
+    position:sticky;top:0;z-index:5;backdrop-filter:blur(8px)}
+  .top-in{max-width:760px;margin:0 auto;padding:12px 22px;font-weight:600;font-size:14px}
+  .top-in span{color:var(--accent)}
+  h1{font-size:25px;font-weight:700;letter-spacing:-.02em;margin:0 0 12px;line-height:1.34}
+  .lede{color:var(--ink-soft);margin:0 0 8px}
+  h2{font-size:19px;font-weight:700;letter-spacing:-.01em;margin:44px 0 4px;padding-top:10px;border-top:2px solid var(--border)}
+  h2:first-of-type{border-top:none}
+  .h2sub{color:var(--ink-faint);font-size:12.5px;margin:0 0 18px}
+  h3{font-size:15.5px;font-weight:600;margin:22px 0 6px}
+
+  .pill{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:99px;vertical-align:middle;letter-spacing:.02em}
+  .pill.p1{background:color-mix(in srgb,var(--miss) 18%,transparent);color:var(--miss)}
+  .pill.p2{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+  .pill.p3{background:color-mix(in srgb,var(--info) 16%,transparent);color:var(--info)}
+  .pill.done{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+
+  .item{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:15px 17px;margin:12px 0;box-shadow:var(--shadow)}
+  .item h3{margin:0 0 8px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .item h3 .n{font-family:"IBM Plex Mono";color:var(--accent);font-weight:600;font-size:13px}
+  .row{display:grid;grid-template-columns:64px 1fr;gap:4px 12px;font-size:13.5px;margin:4px 0}
+  .row .k{color:var(--ink-faint);font-size:12px;padding-top:1px}
+  .row .v{color:var(--ink)}
+  .row .v ul{margin:3px 0;padding-left:16px}
+  .row .v li{margin:2px 0}
+  .tag{font-family:"IBM Plex Sans KR";background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:0 5px;font-size:12px}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--ink-faint);font-weight:600;font-family:"IBM Plex Sans KR"}
+  .scroll{overflow-x:auto}
+
+  .callout{margin:14px 0;padding:12px 15px;border-radius:10px;font-size:13.5px;background:var(--surface-2);border:1px solid var(--border);color:var(--ink-soft)}
+  .callout.ok{background:color-mix(in srgb,var(--ok) 12%,var(--surface));border-color:color-mix(in srgb,var(--ok) 30%,var(--border));color:var(--ink)}
+  .callout.warn{background:color-mix(in srgb,var(--warn) 12%,var(--surface));border-color:color-mix(in srgb,var(--warn) 32%,var(--border));color:var(--ink)}
+  .callout b{color:var(--ink)}
+  .callout ul{margin:6px 0 0;padding-left:18px}
+
+  ol.phase{counter-reset:p;list-style:none;margin:0;padding:0}
+  ol.phase>li{counter-increment:p;position:relative;padding:10px 0 10px 34px;border-top:1px solid var(--border);font-size:13.5px}
+  ol.phase>li:first-child{border-top:none}
+  ol.phase>li::before{content:counter(p);position:absolute;left:0;top:9px;width:22px;height:22px;border-radius:6px;
+    background:var(--accent-fill);color:#fff;font-family:"IBM Plex Mono";font-size:11px;font-weight:700;display:grid;place-items:center}
+  ol.phase b{font-weight:600}
+
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--border);font-size:12px;color:var(--ink-faint);text-align:center}
+  a{color:var(--accent)}
+  @media(max-width:520px){.wrap{padding:28px 15px 70px}.row{grid-template-columns:1fr}.row .k{padding-top:8px}}
+</style>
+
+<header class="top"><div class="top-in">맘무스 <span>2차 개발 기획서</span> · 피드백 13건 정리 + 원문 재점검</div></header>
+
+<div class="wrap">
+  <h1>보내주신 보완점 13건을 기획으로 먼저 가공했어요</h1>
+  <p class="lede">각 항목의 <b>현상 → 목표 → 구현 방안 → 데이터 모델 → 난이도</b>를 정리하고, 6개 원문 문서와 다시 대조해 누락이 없는지 확인했습니다. 승인 없이 이 순서대로 착수합니다.</p>
+  <p class="lede">우선순위: <span class="pill p1">P1 버그·필수</span> <span class="pill p2">P2 구조·QA</span> <span class="pill p3">P3 신규 기능</span></p>
+
+  <div class="callout"><b>"inna" 질문 답</b> — 여행 추가 폼의 <code>타임존 (IANA)</code> 칸입니다. "IANA"는 세계 시간대 표준 이름(<code>Asia/Ho_Chi_Minh</code> 등)의 약자인데, 비개발자에겐 헷갈리는 용어라 <b>도시 선택 드롭다운</b>(하노이·서울·도쿄·방콕…)으로 바꿉니다. → 항목 3에 포함.</div>
+
+  <h2>A · 원문 6개 문서 재점검</h2>
+  <p class="h2sub">05 기획서 / 01 요구사항 / 02 데이터 xlsx / 03·04 개발 프롬프트 / 마스코트 시트</p>
+
+  <div class="scroll"><table>
+    <tr><th>원문 요구</th><th>현재</th><th>비고</th></tr>
+    <tr><td>5탭 · PIN 250914 · Undo/Redo 30 · 모바일 프레임</td><td class="pill done">완료</td><td>+ 카카오/구글 로그인, 클라우드 동기화(요구 외 추가)</td></tr>
+    <tr><td>일정: 타임라인 DND · 동선 구글맵 · 타임존 자동이동(KST/ICT)</td><td class="pill done">완료</td><td>동선 실제 구글맵 연동됨. 좌표는 지오코딩 자동</td></tr>
+    <tr><td>맛집: 프리셋 카테고리 + 수기등록 · 열순서/필터/정렬 · <b>미니 지도 상단/하단</b></td><td class="pill p2">부분</td><td><b>미니맵이 Mock 스타일(구역 점)</b> → 실제 구글맵 필요(항목 5). 하단 지도는 없음(상단만)</td></tr>
+    <tr><td>Todo: 노션식 · 완료토글 · 우선순위 태그</td><td class="pill done">완료</td><td>우선순위 UX 개선 요청(항목 10)</td></tr>
+    <tr><td>가계부: 6카테고리 · big.js 환율 · 날짜/카테고리 필터 · 하단합계 · 1초 자동저장</td><td class="pill done">완료</td><td>표 형식 필터/정렬 일관화 대상(항목 8)</td></tr>
+    <tr><td>MY: 채팅(프로필/배경/시각) · 여행선택(격리) · 설정(PIN)</td><td class="pill p2">부분</td><td><b>여행 수정/삭제 없음</b>(항목 1) · 상대 프로필 사진 노출/상세(항목 9)</td></tr>
+    <tr><td>02 xlsx — 항공권·맛집·숙소·TOP15 시드 매핑</td><td class="pill done">완료</td><td>4시트 모두 화면 노출됨</td></tr>
+    <tr><td>02 xlsx — <b>"지역별 특성" 시트</b></td><td class="pill miss">미사용</td><td>03·04·01에 명시 요구는 <b>없음</b>(참고자료). 단 항목 6의 지역 필터에 활용 가치 큼</td></tr>
+    <tr><td>디자인 가이드 — 명조/고딕 폰트 분리</td><td class="pill p3">변경</td><td>사용자 지시로 NanumSquare 통일. 의도된 변경</td></tr>
+    <tr><td>마스코트 터치포인트 5종</td><td class="pill p2">3/5</td><td>PIN 반짝임·DND 햅틱·빈화면 ✓ / 가계부 "예쁜 지출" 도장·MY D-Day 커플 일러스트 ✗</td></tr>
+  </table></div>
+
+  <div class="callout ok"><b>재점검 결론</b> — 원문의 <b>명시적 요구는 거의 100% 반영</b>. 남은 것은 (a) 맛집 미니맵 실제 지도화, (b) 여행 수정/삭제, (c) 표 필터 일관화, (d) 마스코트 터치포인트 2종 — 모두 아래 13건에 포함됩니다.</div>
+
+  <h2>B · 피드백 13건 → 기능 명세</h2>
+
+  <div class="item">
+    <h3><span class="n">03</span> 새 여행 카드 클릭 시 먹통 <span class="pill p1">P1 버그</span></h3>
+    <div class="row"><span class="k">현상</span><span class="v">새로 만든 여행을 누르면 화면이 하얗게/까맣게 빔 (앱 크래시)</span></div>
+    <div class="row"><span class="k">원인</span><span class="v">타임존 값이 잘못되면 <code>Intl.DateTimeFormat</code>이 예외를 던지고, 일정 탭 전체가 죽음</span></div>
+    <div class="row"><span class="k">구현</span><span class="v"><ul>
+      <li><code>safeTz()</code> 가드 — 잘못된 타임존이면 기본값으로 대체 <span class="tag">착수됨</span></li>
+      <li>탭 단위 <b>ErrorBoundary</b> — 한 탭이 죽어도 앱 전체는 살아있고 "새로고침" 안내</li>
+      <li>타임존 입력을 <b>도시 드롭다운</b>으로 (하노이/서울/도쿄/방콕/싱가포르/파리/뉴욕…) — "IANA" 용어 제거</li>
+    </ul></span></div>
+  </div>
+
+  <div class="item">
+    <h3><span class="n">01</span> 여행 정보 수정 / 삭제 <span class="pill p1">P1</span></h3>
+    <div class="row"><span class="k">목표</span><span class="v">여행 카드에서 이름·목적지·날짜·도시·항공편 수정, 여행 삭제</span></div>
+    <div class="row"><span class="k">구현</span><span class="v"><ul>
+      <li>카드 우측 <code>⋯</code> → [수정] [삭제]</li>
+      <li>수정: 추가 폼 재사용(값 채워서), 저장 시 <code>patchProject</code></li>
+      <li>삭제: 확인 팝업 → 제거. 활성 여행이면 다른 여행으로 전환. <b>마지막 1개는 삭제 불가</b></li>
+      <li>클라우드 여행: 소유자만 삭제 가능, Supabase <code>trips</code> 행도 삭제</li>
+      <li>스토어: <code>removeProject(id)</code> 추가</li>
+    </ul></span></div>
+  </div>
+
+  <div class="item">
+    <h3><span class="n">02</span> 편명 → 항공사 이름 자동 매칭 <span class="pill p2">P2</span></h3>
+    <div class="row"><span class="k">목표</span><span class="v"><code>VJ961</code> 입력 → "비엣젯항공" 자동 표시/저장</span></div>
+    <div class="row"><span class="k">구현</span><span class="v"><ul>
+      <li>IATA 접두사 사전: VJ 비엣젯 · VN 베트남항공 · QH 뱀부항공 · KE 대한항공 · OZ 아시아나 · 7C 제주항공 · TW 티웨이 · LJ 진에어 · BX 에어부산 · RS 에어서울 · ZE 이스타 …</li>
+      <li><code>Flight.carrier?</code> 필드 추가 — 편명 앞 2글자로 자동 채움, 수정 가능</li>
+      <li>여행 카드/타임라인 항공편 표기에 항공사명 노출</li>
+    </ul></span></div>
+  </div>
+
+  <div class="item">
+    <h3><span class="n">05</span> 맛집 탭 상단 지도 = 실제 구글맵 <span class="pill p2">P2</span></h3>
+    <div class="row"><span class="k">현상</span><span class="v">맛집 미니맵은 Mock 스타일(격자 + 구역 중심 점). 동선 탭만 실제 구글맵</span></div>
+    <div class="row"><span class="k">구현</span><span class="v"><ul>
+      <li>공용 <code>&lt;TripMap&gt;</code> 컴포넌트로 추출 → 동선·맛집·숙소 공용</li>
+      <li>구글맵 키 있으면 실제 지도 + 마커. 행 클릭 → 핀 이동(동선 탭과 동일)</li>
+      <li>맛집 좌표: 화면에 보이는/선택된 항목만 지연 지오코딩 (80곳 전부 X — 비용·속도)</li>
+    </ul></span></div>
+  </div>
+
+  <div class="item">
+    <h3><span class="n">06</span> 일정 탭 필터 재구조화 — 1·2·3차 분류 <span class="pill p3">P3 구조</span></h3>
+    <div class="row"><span class="k">목표</span><span class="v">관광지·맛집·숙소를 <b>한 화면</b>에서 다루는 통합 "장소" 뷰.
+      <b>1차</b> 지역별(중복 가능 다중선택, 구글시트식) · <b>2차</b> [랜드마크/관광지] [맛집·카페·식당] [숙소] 3버튼 · <b>3차</b> 세부 카테고리·정렬 · <b>1차↔2차 순서 커스텀 토글</b></span></div>
+    <div class="row"><span class="k">데이터</span><span class="v"><ul>
+      <li>통합 타입 <code>Place { kind: 'landmark' | 'food' | 'stay', name, nameKo, area, category, coords, priceText, note, menu, mapUrl }</code></li>
+      <li>기존 <code>spots</code>/<code>restaurants</code>/<code>hotels</code>를 <code>places</code> 하나로 마이그레이션 (persist v5)</li>
+      <li>"추천 스팟 담기" 모달(항목 4)도 이 필터 컴포넌트 재사용</li>
+    </ul></span></div>
+    <div class="row"><span class="k">주의</span><span class="v">가장 큰 개편. 맛집 탭·추천 스팟·숙소 뷰가 이 구조 위에 재구축됨. Phase C로.</span></div>
+  </div>
+
+  <div class="item">
+    <h3><span class="n">04</span> 추천 스팟 담기 모달 — 2단계 버튼 필터 <span class="pill p3">P3</span></h3>
+    <div class="row"><span class="k">목표</span><span class="v">모달 상단 1차 지역 버튼 → 그 아래 2차 카테고리 버튼(1차로 걸러진 것 기준) → 1↔2차 순서 토글</span></div>
+    <div class="row"><span class="k">구현</span><span class="v">항목 6의 통합 필터 컴포넌트 <code>&lt;PlaceFilter&gt;</code>를 모달에서도 사용. 담기 버튼은 그대로.</span></div>
+  </div>
+
+  <div class="item">
+    <h3><span class="n">07</span> 맛집 탭 구역별 분류 QA <span class="pill p2">P2</span></h3>
+    <div class="row"><span class="k">체크</span><span class="v"><ul>
+      <li>복합 구역("바딘/올드쿼터")이 개별 칩으로 분리되는가</li>
+      <li>구역 칩 다중 선택 시 AND/OR 동작이 기대대로인가 (현재 OR)</li>
+      <li>구역 없는 항목("전역 체인") 처리</li>
+      <li>구글맵 링크로 추가한 신규 장소(항목 13)의 구역 자동 판정</li>
+    </ul></span></div>
+    <div class="row"><span class="k">산출</span><span class="v">QA 체크리스트 + 발견 이슈 수정</span></div>
+  </div>
+
+  <div class="item">
+    <h3><span class="n">08</span> 모든 표 = 구글시트/엑셀식 열 필터 + 정렬 <span class="pill p2">P2</span></h3>
+    <div class="row"><span class="k">현재</span><span class="v"><code>&lt;DataTable&gt;</code> 컴포넌트 존재 (숙소 뷰에 적용). 열 드래그·표시/숨김·열별 text/multi 필터·정렬 지원</span></div>
+    <div class="row"><span class="k">구현</span><span class="v"><ul>
+      <li>맛집 표 → <code>DataTable</code>로 통일 (현재 커스텀 구현)</li>
+      <li>가계부 목록 → 표 형태 옵션 (날짜·카테고리·지출처·VND·KRW 열)</li>
+      <li>숫자 열에 <b>범위 필터</b>(min~max) 추가</li>
+    </ul></span></div>
+  </div>
+
+  <div class="item">
+    <h3><span class="n">09</span> 채팅 — 프로필 사진 노출 + 상대 프로필 상세 <span class="pill p2">P2</span></h3>
+    <div class="row"><span class="k">목표</span><span class="v">카톡처럼 메시지마다 발신자 프로필 사진. 사진 클릭 → 상대방 <b>배경·프로필 사진·상태 메시지</b> 모달</span></div>
+    <div class="row"><span class="k">구현</span><span class="v"><ul>
+      <li><code>UserProfile.statusMessage</code> 추가. 클라우드 <code>profiles</code> 테이블에 <code>status_message</code>, <code>chat_bg_url</code> 컬럼</li>
+      <li>메시지 <code>author</code>를 userId로 저장(현재 이름 문자열) → 프로필 조인</li>
+      <li>로컬 PIN 모드: 프로필 1개뿐이라 "상대" 개념 없음 → 클라우드 로그인 시에만 완전 동작</li>
+    </ul></span></div>
+  </div>
+
+  <div class="item">
+    <h3><span class="n">10</span> Todo — 우선순위 드롭다운 + 담당자 <span class="pill p2">P2</span></h3>
+    <div class="row"><span class="k">구현</span><span class="v"><ul>
+      <li>우선순위: 태그 클릭 순환 → <code>&lt;select&gt;</code> (높음/보통/낮음)</li>
+      <li>담당자: 여행 참여자 닉네임 목록에서 선택 (<code>Todo.assignee?</code>)</li>
+      <li>참여자 목록 = 클라우드 <code>trip_members</code> 프로필 / 로컬은 본인만</li>
+      <li>담당자별 필터 칩</li>
+    </ul></span></div>
+  </div>
+
+  <div class="item">
+    <h3><span class="n">11</span> 한 줄 일기 탭(섹션) 신설 <span class="pill p3">P3 신규</span></h3>
+    <div class="row"><span class="k">목표</span><span class="v">매일 원할 때 한 줄 일기 작성·공유. 날짜별, 참여자별</span></div>
+    <div class="row"><span class="k">위치</span><span class="v">하단 탭은 5개 고정(요구사항) → <b>MY 탭 서브메뉴에 [일기] 추가</b> ([채팅][여행선택][일기][설정]). 또는 일정 탭 [타임라인][동선][일기]. → MY 서브 추천</span></div>
+    <div class="row"><span class="k">데이터</span><span class="v"><code>DiaryEntry { id, date, author, text, mood?, createdAt }</code> — <code>TripDoc.diary[]</code>. 클라우드 doc에 포함되어 자동 동기화</span></div>
+  </div>
+
+  <div class="item">
+    <h3><span class="n">12</span> 타임라인 읽기전용/편집 모드 + 좋아요·코멘트 + 추억함 <span class="pill p3">P3 큰 기능</span></h3>
+    <div class="row"><span class="k">모드</span><span class="v"><b>편집 ⇄ 읽기전용</b> 토글. 편집 중/저장 내용은 실시간으로 서로 보임(클라우드 동기화 有). 편집 중인 사람 표시(presence)</span></div>
+    <div class="row"><span class="k">읽기전용</span><span class="v">행 클릭 → 상세 모달:
+      <ul>
+        <li><b>좋아요</b> 버튼 (참여자별 토글) — <code>TimelineItem.likes: userId[]</code></li>
+        <li><b>코멘트</b> (댓글 형식, 참여자별) — <code>TimelineItem.comments: {id, author, text, at}[]</code></li>
+      </ul></span></div>
+    <div class="row"><span class="k">추억함</span><span class="v"><b>MY 탭 새 섹션</b> — 참여자 <b>전원이 좋아요</b> 한 장소(교집합) + 남긴 코멘트 모아보기. 여행 후 회고용</span></div>
+    <div class="row"><span class="k">마스코트</span><span class="v">"두 맘무가 하트 뿔 맞댄" 일러스트를 추억함 헤더에 → 미구현 터치포인트 해소 (이미지 1장 필요)</span></div>
+  </div>
+
+  <div class="item">
+    <h3><span class="n">13</span> 구글맵 링크 15개 → 분석·분류·등록 <span class="pill p2">P2</span></h3>
+    <div class="row"><span class="k">완료</span><span class="v">링크를 <code>https://</code> 기준으로 분리(중복 제거 14곳) → 각 링크 방문해 장소 확인함:</span></div>
+    <div class="scroll"><table>
+      <tr><th>장소</th><th>지역</th><th>분류</th></tr>
+      <tr><td>롯데센터 하노이 (전망대·롯데마트)</td><td>바딘</td><td>쇼핑몰</td></tr>
+      <tr><td>Vincom Center Metropolis</td><td>바딘</td><td>쇼핑몰</td></tr>
+      <tr><td>빈콤 쩐지흥 (Vincom Trần Duy Hưng)</td><td>꺼우저이</td><td>쇼핑몰</td></tr>
+      <tr><td>메가마켓 탕롱점 (MM Mega Market Thăng Long)</td><td>꺼우저이</td><td>대형마트</td></tr>
+      <tr><td>빈콤 메가몰 로얄시티 (지하 대형몰)</td><td>탄쑤언</td><td>쇼핑몰</td></tr>
+      <tr><td>빈컴 메가몰 스마트시티</td><td>남뜨리엠</td><td>쇼핑몰</td></tr>
+      <tr><td>하노이 박물관 (Hanoi Museum)</td><td>남뜨리엠</td><td>랜드마크·박물관</td></tr>
+      <tr><td>이온몰 롱비엔점 (AEON Mall Long Biên)</td><td>롱비엔</td><td>쇼핑몰</td></tr>
+      <tr><td>Mipec Long Biên</td><td>롱비엔</td><td>쇼핑몰</td></tr>
+      <tr><td>TASCO Mall</td><td>롱비엔(비엣흥)</td><td>쇼핑몰</td></tr>
+      <tr><td>AEON Mall Hà Đông</td><td>하동</td><td>쇼핑몰</td></tr>
+      <tr><td>MAC Plaza (한인타운)</td><td>하동</td><td>쇼핑몰</td></tr>
+      <tr><td>MM Mega Market Hà Đông</td><td>하동</td><td>대형마트</td></tr>
+      <tr><td>천당보손 파크 (Thiên Đường Bảo Sơn)</td><td>안카인</td><td>놀이공원·랜드마크</td></tr>
+    </table></div>
+    <div class="row"><span class="k">구현</span><span class="v">위 14곳을 <code>places</code> 시드에 추가 (쇼핑몰 12 · 랜드마크 2). 구글맵 키로 평점·좌표·영업시간 보강. 신규 구역 "롱비엔·하동·탄쑤언·남뜨리엠·안카인" 좌표 추가.</span></div>
+  </div>
+
+  <h2>C · 착수 순서</h2>
+  <ol class="phase">
+    <li><b>Phase A — 버그·빠른 수정</b> <span class="pill p1">P1</span><br>항목 3 (크래시·타임존 드롭다운·ErrorBoundary) · 1 (여행 수정/삭제) · 2 (항공사 자동매칭) · 13 데이터 등록</li>
+    <li><b>Phase B — QA·표 일관화·중간 기능</b> <span class="pill p2">P2</span><br>항목 8 (모든 표 DataTable화) · 7 (구역 필터 QA) · 5 (맛집 실제 구글맵) · 10 (Todo 드롭다운·담당자) · 9 (채팅 프로필)</li>
+    <li><b>Phase C — 구조 개편·신규</b> <span class="pill p3">P3</span><br>항목 6 (통합 Place 뷰 1·2·3차 필터) · 4 (추천 스팟 모달) · 11 (한 줄 일기) · 12 (읽기전용 모드·좋아요·코멘트·추억함)</li>
+  </ol>
+  <div class="callout warn"><b>Phase C의 항목 6·12는 데이터 모델 변경(persist v5)</b>을 동반합니다. 기존 사용자 데이터 마이그레이션 코드를 함께 작성하고, 배포 전 로컬에서 충분히 테스트합니다.</div>
+
+  <div class="callout ok"><b>진행 방식</b> — Phase A부터 순서대로 구현 → 각 Phase 끝나면 GitHub push(자동 배포) + 이 문서에 진행 표시. 큰 항목(6·12)은 착수 전 화면 스케치를 먼저 공유드릴게요.</div>
+
+  <footer>맘무스 · 큰맘 먹고 떠나는 커플 여행 — 2차 개발 기획서 · 2026-09-03</footer>
+</div>

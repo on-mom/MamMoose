@@ -2,6 +2,7 @@ import { Undo2, Redo2, Lock } from 'lucide-react';
 import { useAppStore, useActiveProject, useCanUndo, useCanRedo } from '../store/useAppStore';
 import { TAB_VIEWS } from '../tabs';
 import { Moose } from './Moose';
+import ErrorBoundary from './ErrorBoundary';
 import BottomNav from './BottomNav';
 
 /** 오늘 기준 D-day 뱃지 텍스트 (기기 로컬 날짜 기준) */
@@ -73,11 +74,13 @@ export default function Layout() {
         </div>
       </header>
 
-      {/* 탭 콘텐츠 — key로 리마운트해 CSS fade-in */}
+      {/* 탭 콘텐츠 — key로 리마운트해 CSS fade-in + 탭별 오류 격리 */}
       <main className="pb-tabbar relative flex-1 overflow-y-auto">
-        <div key={activeTab} className="animate-[fade_.18s_ease]">
-          <View />
-        </div>
+        <ErrorBoundary key={activeTab}>
+          <div className="animate-[fade_.18s_ease]">
+            <View />
+          </div>
+        </ErrorBoundary>
       </main>
 
       <BottomNav />

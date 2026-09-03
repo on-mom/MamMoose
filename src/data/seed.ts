@@ -914,6 +914,138 @@ export const SEED_RESTAURANTS: Omit<Restaurant, 'id' | 'projectId'>[] = [
     "priceKrwText": "약 30,000~44,000원",
     "priceVndAvg": 675000,
     "note": "타레 양념의 정통 일식 숯불 구이"
+  },
+  {
+    "name": "Lotte Center Hanoi",
+    "nameKo": "롯데센터 하노이",
+    "category": "쇼핑몰",
+    "area": "바딘",
+    "mapUrl": "https://maps.google.com/?q=Lotte%20Center%20Hanoi",
+    "priceVndText": "",
+    "priceKrwText": "",
+    "priceVndAvg": 0,
+    "note": "전망대·롯데마트·기념품 쇼핑 최적, 대관람차"
+  },
+  {
+    "name": "Vincom Center Metropolis",
+    "nameKo": "빈콤 센터 메트로폴리스",
+    "category": "쇼핑몰",
+    "area": "바딘",
+    "mapUrl": "https://maps.google.com/?q=Vincom%20Center%20Metropolis%20Lieu%20Giai%20Hanoi",
+    "priceVndText": "",
+    "priceKrwText": "",
+    "priceVndAvg": 0,
+    "note": "리에우자이 고급 주상복합 쇼핑센터"
+  },
+  {
+    "name": "Vincom Trần Duy Hưng",
+    "nameKo": "빈콤 쩐지흥",
+    "category": "쇼핑몰",
+    "area": "꺼우저이",
+    "mapUrl": "https://maps.google.com/?q=Vincom%20Tran%20Duy%20Hung%20Hanoi",
+    "priceVndText": "",
+    "priceKrwText": "",
+    "priceVndAvg": 0,
+    "note": "꺼우저이 대형 빈콤 쇼핑몰"
+  },
+  {
+    "name": "MM Mega Market Thăng Long",
+    "nameKo": "메가마켓 탕롱점",
+    "category": "대형마트",
+    "area": "꺼우저이",
+    "mapUrl": "https://maps.google.com/?q=MM%20Mega%20Market%20Thang%20Long%20Hanoi",
+    "priceVndText": "",
+    "priceKrwText": "",
+    "priceVndAvg": 0,
+    "note": "현지 대형 창고형 마트, 팜반동 거리"
+  },
+  {
+    "name": "Vincom Mega Mall Royal City",
+    "nameKo": "빈콤 메가몰 로얄시티",
+    "category": "쇼핑몰",
+    "area": "탄쑤언",
+    "mapUrl": "https://maps.google.com/?q=Vincom%20Mega%20Mall%20Royal%20City%20Hanoi",
+    "priceVndText": "",
+    "priceKrwText": "",
+    "priceVndAvg": 0,
+    "note": "지하 대형몰 · 아이스링크·워터파크"
+  },
+  {
+    "name": "Vincom Mega Mall Smart City",
+    "nameKo": "빈콤 메가몰 스마트시티",
+    "category": "쇼핑몰",
+    "area": "남뜨리엠",
+    "mapUrl": "https://maps.google.com/?q=Vincom%20Mega%20Mall%20Smart%20City%20Hanoi",
+    "priceVndText": "",
+    "priceKrwText": "",
+    "priceVndAvg": 0,
+    "note": "떠이모 빈홈 스마트시티 내 대형몰"
+  },
+  {
+    "name": "AEON Mall Long Biên",
+    "nameKo": "이온몰 롱비엔점",
+    "category": "쇼핑몰",
+    "area": "롱비엔",
+    "mapUrl": "https://maps.google.com/?q=AEON%20Mall%20Long%20Bien%20Hanoi",
+    "priceVndText": "",
+    "priceKrwText": "",
+    "priceVndAvg": 0,
+    "note": "일본계 대형몰, 이온 슈퍼·푸드코트"
+  },
+  {
+    "name": "Mipec Long Biên",
+    "nameKo": "미펙 롱비엔",
+    "category": "쇼핑몰",
+    "area": "롱비엔",
+    "mapUrl": "https://maps.google.com/?q=Mipec%20Long%20Bien%20Hanoi",
+    "priceVndText": "",
+    "priceKrwText": "",
+    "priceVndAvg": 0,
+    "note": "롱비엔 복합 쇼핑몰·영화관"
+  },
+  {
+    "name": "TASCO Mall",
+    "nameKo": "타스코 몰",
+    "category": "쇼핑몰",
+    "area": "롱비엔",
+    "mapUrl": "https://maps.google.com/?q=TASCO%20Mall%20Viet%20Hung%20Hanoi",
+    "priceVndText": "",
+    "priceKrwText": "",
+    "priceVndAvg": 0,
+    "note": "비엣흥 신규 쇼핑몰"
+  },
+  {
+    "name": "AEON Mall Hà Đông",
+    "nameKo": "이온몰 하동점",
+    "category": "쇼핑몰",
+    "area": "하동",
+    "mapUrl": "https://maps.google.com/?q=AEON%20Mall%20Ha%20Dong%20Hanoi",
+    "priceVndText": "",
+    "priceKrwText": "",
+    "priceVndAvg": 0,
+    "note": "즈엉노이 대형 이온몰"
+  },
+  {
+    "name": "MAC Plaza",
+    "nameKo": "MAC 플라자",
+    "category": "쇼핑몰",
+    "area": "하동",
+    "mapUrl": "https://maps.google.com/?q=MAC%20Plaza%20Tran%20Phu%20Ha%20Dong%20Hanoi",
+    "priceVndText": "",
+    "priceKrwText": "",
+    "priceVndAvg": 0,
+    "note": "하동 한인타운 중심, 한국 식당·마트 밀집"
+  },
+  {
+    "name": "MM Mega Market Hà Đông",
+    "nameKo": "메가마켓 하동점",
+    "category": "대형마트",
+    "area": "하동",
+    "mapUrl": "https://maps.google.com/?q=MM%20Mega%20Market%20Ha%20Dong%20Hanoi",
+    "priceVndText": "",
+    "priceKrwText": "",
+    "priceVndAvg": 0,
+    "note": "하동 창고형 대형마트"
   }
 ];
 
@@ -1095,6 +1227,20 @@ export const SEED_SPOTS: Omit<Spot, 'id' | 'projectId'>[] = [
     "area": "서호",
     "tip": "트렌디한 라이프스타일 거리, 노천 바 & 루프톱 감성",
     "nearby": "Maison de Tet Decor"
+  },
+  {
+    "name": "Hanoi Museum",
+    "category": "랜드마크",
+    "area": "남뜨리엠",
+    "tip": "역피라미드 형태 건축이 인상적, 베트남 근현대 전시",
+    "nearby": "Keangnam Landmark 72"
+  },
+  {
+    "name": "Thiên Đường Bảo Sơn",
+    "category": "랜드마크",
+    "area": "안카인",
+    "tip": "하노이 근교 대형 테마파크·워터파크·동물원",
+    "nearby": "An Khánh"
   }
 ];
 

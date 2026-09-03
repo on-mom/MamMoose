@@ -162,6 +162,12 @@ export async function createInvite(tripId: string): Promise<{ code?: string; err
   return { code };
 }
 
+export async function deleteCloudTrip(tripId: string) {
+  if (!supabase || !isCloudId(tripId)) return;
+  const { error } = await supabase.from('trips').delete().eq('id', tripId);
+  if (error) err('여행 삭제 실패: ' + error.message);
+}
+
 export async function acceptInvite(code: string): Promise<{ ok: boolean; error?: string }> {
   if (!supabase) return { ok: false, error: '클라우드가 꺼져 있습니다' };
   const { data, error } = await supabase.rpc('accept_invite', { invite_code: code.trim().toUpperCase() });

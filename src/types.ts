@@ -7,6 +7,7 @@ export type TabKey = 'schedule' | 'restaurants' | 'todo' | 'budget' | 'my';
 export interface Flight {
   date: string;       // YYYY-MM-DD
   flightNo: string;   // 편명 (예: VJ961)
+  carrier?: string;   // 항공사명 (편명으로 자동 채움, 수정 가능)
   depAirport: string; // 출발 공항 코드 (예: ICN)
   depTime: string;    // HH:mm
   arrAirport: string; // 도착 공항 코드 (예: HAN)
