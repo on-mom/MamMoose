@@ -48,6 +48,18 @@ export interface TimelineItem {
   lat: number | null;
   lng: number | null;
   memo?: string;
+  /** 좋아요 누른 참여자 닉네임 */
+  likes?: string[];
+  /** 코멘트 (참여자별) */
+  comments?: TimelineComment[];
+}
+
+export interface TimelineComment {
+  id: string;
+  author: string;
+  text: string;
+  /** epoch ms */
+  at: number;
 }
 
 export type RestaurantCategory =

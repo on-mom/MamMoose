@@ -13,8 +13,9 @@ import Modal from '../components/Modal';
 import { outboundText, inboundText, carrierOf } from '../lib/flight';
 import { CITY_TZ } from '../lib/cities';
 import DiaryView from './DiaryView';
+import MemoriesView, { useMemoryPicks, tripEnded } from './MemoriesView';
 
-type Sub = 'chat' | 'diary' | 'trips' | 'settings';
+type Sub = 'chat' | 'diary' | 'memories' | 'trips' | 'settings';
 const hhmm = (ts: number) =>
   new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
@@ -30,10 +31,20 @@ const readImage = (file: File): Promise<string> =>
 export default function MyTab() {
   const [sub, setSub] = useState<Sub>('chat');
   const cloudError = useAppStore((s) => s.cloudError);
+  const project = useActiveProject();
+  const picks = useMemoryPicks();
+  const showMemories = !!project && (tripEnded(project) || picks.length > 0);
+
+  const tabs: [Sub, string][] = [
+    ['chat', '채팅'], ['diary', '일기'],
+    ...(showMemories ? [['memories', '추억함'] as [Sub, string]] : []),
+    ['trips', '여행'], ['settings', '설정'],
+  ];
+
   return (
     <div className="edge flex h-full flex-col py-3">
-      <div className="mb-3 flex gap-1 rounded-lg bg-moose-dusk p-1 text-xs">
-        {([['chat', '채팅'], ['diary', '일기'], ['trips', '여행'], ['settings', '설정']] as const).map(([k, l]) => (
+      <div className="mb-3 flex gap-1 rounded-lg bg-moose-dusk p-1 text-[11px]">
+        {tabs.map(([k, l]) => (
           <button
             key={k}
             onClick={() => setSub(k)}
@@ -49,8 +60,18 @@ export default function MyTab() {
           <span>{cloudError}</span>
         </div>
       )}
+      {project && tripEnded(project) && picks.length > 0 && sub !== 'memories' && (
+        <button
+          onClick={() => setSub('memories')}
+          className="mb-2 flex items-center gap-2 rounded-lg bg-moose-heart/12 px-3 py-2 text-left text-[11px] text-moose-heart ring-1 ring-moose-heart/25"
+        >
+          <span className="text-sm">💗</span>
+          여행이 끝났어요 — 추억함에서 둘이 함께 좋아한 {picks.length}곳을 확인해 보세요
+        </button>
+      )}
       {sub === 'chat' && <Chat />}
       {sub === 'diary' && <DiaryView />}
+      {sub === 'memories' && <MemoriesView />}
       {sub === 'trips' && <Trips />}
       {sub === 'settings' && <Settings />}
     </div>

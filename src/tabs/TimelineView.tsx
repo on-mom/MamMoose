@@ -8,12 +8,13 @@ import {
   SortableContext, useSortable, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Plus, Trash2, Clock, MapPin, Sparkles } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Clock, MapPin, Sparkles, Heart, MessageCircle, Lock, Pencil } from 'lucide-react';
 import type { TimelineItem } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { computeFocus } from '../lib/timezone';
 import { coordsForArea } from '../lib/areaCoords';
+import { useMemberNames, useMyName } from '../lib/members';
 import Modal from '../components/Modal';
 import { DiaryQuickWrite } from './DiaryView';
 
@@ -47,6 +48,8 @@ export default function TimelineView() {
   const days = tripDays(project.startDate, project.endDate);
   const [picker, setPicker] = useState(false);
   const [pickerDay, setPickerDay] = useState(1);
+  const [mode, setMode] = useState<'read' | 'edit'>('read');
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const byId = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items]);
   const [board, setBoard] = useState<Board>(() => boardFromItems(items, days));
@@ -164,6 +167,26 @@ export default function TimelineView() {
 
       <DiaryQuickWrite />
 
+      <div className="flex items-center justify-between rounded-lg bg-moose-dusk/50 px-2 py-1.5">
+        <div className="flex gap-1 text-[11px]">
+          <button
+            onClick={() => setMode('read')}
+            className={`flex items-center gap-1 rounded-md px-2.5 py-1 ${mode === 'read' ? 'bg-moose-heart text-white' : 'text-slate-400'}`}
+          >
+            <Lock size={11} /> 읽기
+          </button>
+          <button
+            onClick={() => setMode('edit')}
+            className={`flex items-center gap-1 rounded-md px-2.5 py-1 ${mode === 'edit' ? 'bg-moose-heart text-white' : 'text-slate-400'}`}
+          >
+            <Pencil size={11} /> 편집
+          </button>
+        </div>
+        <span className="pr-1 text-[10px] text-slate-500">
+          {mode === 'read' ? '항목을 눌러 좋아요·코멘트' : '저장 내용은 동행자에게 바로 반영'}
+        </span>
+      </div>
+
       {picker && (
         <Modal onClose={() => setPicker(false)} title={<span className="text-sm font-semibold text-white">추천 스팟에서 담기</span>}>
           <div className="space-y-3">
@@ -219,42 +242,74 @@ export default function TimelineView() {
         </Modal>
       )}
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={onDragStart}
-        onDragOver={onDragOver}
-        onDragEnd={onDragEnd}
-      >
-        {dayKeys(days).map((k) => (
-          <section key={k} className="space-y-2">
-            <div className="flex items-center justify-between">
+      {mode === 'read' ? (
+        <div className="space-y-4">
+          {dayKeys(days).map((k) => (
+            <section key={k} className="space-y-2">
               <h3 className="font-title text-base font-bold text-white">
                 {k}일차 <span className="text-xs font-normal text-slate-500">{dateOfDay(project.startDate, Number(k))}</span>
               </h3>
-              <button onClick={() => addItem(Number(k))} className="flex items-center gap-1 text-xs text-moose-heart">
-                <Plus size={14} /> 추가
-              </button>
-            </div>
-            <DayColumn dayKey={k} itemIds={board[k] ?? []}>
+              {(board[k] ?? []).length === 0 && (
+                <p className="rounded-lg border border-dashed border-moose-edge py-3 text-center text-[11px] text-slate-600">
+                  일정이 없어요 · [편집]에서 추가하세요
+                </p>
+              )}
               {(board[k] ?? []).map((id) =>
                 byId[id] ? (
-                  <Row
+                  <ReadCard
                     key={id}
                     item={byId[id]}
                     highlight={id === focus.focusId}
                     innerRef={id === focus.focusId ? focusRef : undefined}
+                    onOpen={() => setDetailId(id)}
                   />
                 ) : null,
               )}
-            </DayColumn>
-          </section>
-        ))}
+            </section>
+          ))}
+        </div>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={onDragStart}
+          onDragOver={onDragOver}
+          onDragEnd={onDragEnd}
+        >
+          {dayKeys(days).map((k) => (
+            <section key={k} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="font-title text-base font-bold text-white">
+                  {k}일차 <span className="text-xs font-normal text-slate-500">{dateOfDay(project.startDate, Number(k))}</span>
+                </h3>
+                <button onClick={() => addItem(Number(k))} className="flex items-center gap-1 text-xs text-moose-heart">
+                  <Plus size={14} /> 추가
+                </button>
+              </div>
+              <DayColumn dayKey={k} itemIds={board[k] ?? []}>
+                {(board[k] ?? []).map((id) =>
+                  byId[id] ? (
+                    <Row
+                      key={id}
+                      item={byId[id]}
+                      highlight={id === focus.focusId}
+                      innerRef={id === focus.focusId ? focusRef : undefined}
+                    />
+                  ) : null,
+                )}
+              </DayColumn>
+            </section>
+          ))}
 
-        <DragOverlay>
-          {activeId && byId[activeId] ? <Card item={byId[activeId]} overlay /> : null}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay>
+            {activeId && byId[activeId] ? <Card item={byId[activeId]} overlay /> : null}
+          </DragOverlay>
+        </DndContext>
+      )}
+
+      {detailId && byId[detailId] && (
+        <ItemDetailModal item={byId[detailId]} onClose={() => setDetailId(null)} />
+      )}
     </div>
   );
 }
@@ -289,6 +344,135 @@ function Row({
         <Card item={item} highlight={highlight} handleProps={{ ...attributes, ...listeners }} />
       </div>
     </div>
+  );
+}
+
+/* ---------- 읽기전용 카드 ---------- */
+function ReadCard({
+  item, highlight, innerRef, onOpen,
+}: { item: TimelineItem; highlight?: boolean; innerRef?: Ref<HTMLDivElement>; onOpen: () => void }) {
+  const likes = item.likes ?? [];
+  const comments = item.comments ?? [];
+  return (
+    <div ref={innerRef}>
+      <button
+        onClick={onOpen}
+        className={`w-full rounded-xl border p-2.5 text-left transition ${
+          highlight ? 'border-moose-heart bg-moose-heart/10' : 'border-white/5 bg-moose-dusk/70 hover:bg-white/[0.05]'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] tabular-nums text-slate-400">{item.startTime}</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{item.place}</span>
+          {item.lat != null && <MapPin size={11} className="shrink-0 text-emerald-500" />}
+        </div>
+        {item.memo && <div className="mt-1 truncate text-[11px] text-slate-400">{item.memo}</div>}
+        {(likes.length > 0 || comments.length > 0) && (
+          <div className="mt-1.5 flex items-center gap-2 text-[10px]">
+            {likes.length > 0 && (
+              <span className="flex items-center gap-0.5 text-moose-heart">
+                <Heart size={11} fill="currentColor" /> {likes.join(' · ')}
+              </span>
+            )}
+            {comments.length > 0 && (
+              <span className="flex items-center gap-0.5 text-slate-500">
+                <MessageCircle size={11} /> {comments.length}
+              </span>
+            )}
+          </div>
+        )}
+      </button>
+    </div>
+  );
+}
+
+/* ---------- 항목 상세 (좋아요 · 코멘트) ---------- */
+function ItemDetailModal({ item, onClose }: { item: TimelineItem; onClose: () => void }) {
+  const mutate = useAppStore((s) => s.mutate);
+  const me = useMyName();
+  const members = useMemberNames();
+  const [text, setText] = useState('');
+  const likes = item.likes ?? [];
+  const comments = item.comments ?? [];
+  const iLike = likes.includes(me);
+  const everyone = members.length > 0 && members.every((m) => likes.includes(m));
+
+  const patchItem = (fn: (it: TimelineItem) => void) =>
+    mutate((doc) => { const it = doc.timeline.find((x) => x.id === item.id); if (it) fn(it); });
+
+  const toggleLike = () =>
+    patchItem((it) => {
+      const set = new Set(it.likes ?? []);
+      set.has(me) ? set.delete(me) : set.add(me);
+      it.likes = [...set];
+    });
+  const addComment = () => {
+    if (!text.trim()) return;
+    patchItem((it) => {
+      (it.comments ??= []).push({ id: uid(), author: me, text: text.trim(), at: Date.now() });
+    });
+    setText('');
+  };
+  const delComment = (cid: string) =>
+    patchItem((it) => { if (it.comments) it.comments = it.comments.filter((c) => c.id !== cid); });
+
+  return (
+    <Modal
+      onClose={onClose}
+      title={
+        <>
+          <div className="font-title text-base font-bold text-white">{item.place}</div>
+          <div className="mt-0.5 text-[12px] text-slate-400">
+            {item.startTime} · 이동 {item.durationMin}분{everyone && ' · 💗 둘 다 좋아요'}
+          </div>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {item.memo && <div className="rounded-lg bg-white/[0.04] p-2.5 text-[13px] text-slate-200">{item.memo}</div>}
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleLike}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${
+              iLike ? 'bg-moose-heart text-white' : 'border border-white/10 text-slate-300'
+            }`}
+          >
+            <Heart size={14} fill={iLike ? 'currentColor' : 'none'} /> 좋아요
+          </button>
+          {likes.length > 0 && <span className="text-[11px] text-slate-400">{likes.join(' · ')}</span>}
+        </div>
+
+        <div className="space-y-2">
+          <div className="text-[11px] font-semibold text-slate-500">코멘트 {comments.length > 0 && `· ${comments.length}`}</div>
+          {comments.map((c) => (
+            <div key={c.id} className="group flex items-start gap-2 rounded-lg bg-white/[0.03] px-2.5 py-1.5">
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-semibold text-slate-300">{c.author}</div>
+                <div className="text-[13px] text-slate-100">{c.text}</div>
+              </div>
+              {c.author === me && (
+                <button onClick={() => delComment(c.id)} className="shrink-0 text-slate-600 hover:text-rose-400">
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </div>
+          ))}
+          <div className="flex gap-2">
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addComment()}
+              placeholder="코멘트 남기기"
+              className="min-w-0 flex-1 rounded-lg bg-moose-edge px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600"
+            />
+            <button onClick={addComment} disabled={!text.trim()} className="btn-heart shrink-0 rounded-lg px-3 text-sm font-semibold disabled:opacity-40">
+              등록
+            </button>
+          </div>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
