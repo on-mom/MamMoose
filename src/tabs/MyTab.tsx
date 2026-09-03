@@ -318,8 +318,35 @@ type TripFormData = {
 const BLANK_FLIGHT: FlightForm = { date: '', flightNo: '', carrier: '', depAirport: '', depTime: '', arrAirport: '', arrTime: '' };
 const hasFlight = (fl: FlightForm) => fl.flightNo || fl.depAirport || fl.date;
 
+/** 여행 카드의 참여자 표시 — people 스냅샷 기준 ("이 여행을 열어본 사람") */
+function Participants({ people }: { people?: Record<string, Person> }) {
+  const names = Object.keys(people ?? {}).filter((k) => k && k !== '나' && k.replace(/[\s.·・_-]/g, ''));
+  if (names.length === 0) {
+    return <span className="text-[11px] text-slate-600">참여자 없음</span>;
+  }
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <div className="flex -space-x-1.5">
+        {names.slice(0, 4).map((n) => {
+          const av = people?.[n]?.avatar;
+          return (
+            <span key={n} className="h-5 w-5 overflow-hidden rounded-full border border-moose-dusk bg-moose-edge">
+              {av ? <img src={av} alt="" className="h-full w-full object-cover" />
+                : <Moose variant="face" className="h-full w-full object-cover" alt="" />}
+            </span>
+          );
+        })}
+      </div>
+      <span className="truncate text-[11px] text-slate-400">
+        {names.slice(0, 3).join(', ')}{names.length > 3 && ` 외 ${names.length - 3}`}
+      </span>
+    </div>
+  );
+}
+
 function Trips() {
   const projects = useAppStore((s) => s.projects);
+  const present = useAppStore((s) => s.present);
   const activeId = useAppStore((s) => s.activeProjectId);
   const setActive = useAppStore((s) => s.setActiveProject);
   const addProject = useAppStore((s) => s.addProject);
@@ -431,13 +458,14 @@ function Trips() {
                 )}
               </div>
             </div>
-            {cloudUser && (
-              <div className="mt-2 border-t border-white/5 pt-2">
-                <button onClick={() => makeInvite(p.id, p.name)} className="flex items-center gap-1 text-xs text-moose-heart">
-                  <UserPlus size={13} /> 동행자 초대
+            <div className="mt-2 flex items-center justify-between gap-2 border-t border-white/5 pt-2">
+              <Participants people={present[p.id]?.people} />
+              {cloudUser && (
+                <button onClick={() => makeInvite(p.id, p.name)} className="flex shrink-0 items-center gap-1 text-xs text-moose-heart">
+                  <UserPlus size={13} /> 초대
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ),
       )}

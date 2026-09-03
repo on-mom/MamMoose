@@ -1,5 +1,6 @@
 import { Undo2, Redo2, Lock } from 'lucide-react';
 import { useAppStore, useActiveProject, useCanUndo, useCanRedo } from '../store/useAppStore';
+import { useRegisterMe } from '../lib/members';
 import { TAB_VIEWS } from '../tabs';
 import { Moose } from './Moose';
 import ErrorBoundary from './ErrorBoundary';
@@ -23,6 +24,7 @@ export default function Layout() {
   const { undo, redo, lock } = useAppStore.getState();
   const canUndo = useCanUndo();
   const canRedo = useCanRedo();
+  useRegisterMe(); // 앱을 켠 사람은 이 여행 참여자로 등록 (조용히 보는 상황 방지)
 
   const View = TAB_VIEWS[activeTab];
 

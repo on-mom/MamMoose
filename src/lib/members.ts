@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 
 /** 현재 사용자 표시 이름 — 앱에서 바꾼 프로필명이 우선(카톡 기본 닉네임보다). */
@@ -23,28 +24,47 @@ export function useMemberNames(): string[] {
   const set = new Set<string>([me]);
   for (const k of Object.keys(people ?? {})) {
     if (k === me || k === cloudName) continue; // 나 / 로그인 기본 닉네임(닉 변경 전 스냅샷)
-    if (isJunkName(k)) continue; // "." 같은 카톡 기본 프로필명
+    if (k === '나' && me !== '나') continue;   // 이름 정하기 전 내 스냅샷
+    if (isJunkName(k)) continue;               // "." 같은 카톡 기본 프로필명
     set.add(k);
   }
   return [...set];
 }
 
-/**
- * @멘션 후보 — 참여자(people) + 채팅을 보낸 적 있는 사람.
- * 담당자보다 느슨하게: 대화에 등장한 이름이면 멘션 가능.
- */
+/** @멘션 후보 = 이 여행 참여자(나 제외). 담당자 목록과 동일 범위. */
 export function useMentionNames(): string[] {
-  const people = useAppStore((s) => s.present[s.activeProjectId]?.people);
-  const messages = useAppStore((s) => s.present[s.activeProjectId]?.messages);
-  const cloudName = useAppStore((s) => s.cloudUser?.name);
   const me = useMyName();
+  return useMemberNames().filter((n) => n !== me);
+}
 
-  const set = new Set<string>();
-  const add = (k?: string | null) => {
-    if (!k || k === me || k === cloudName || isJunkName(k)) return;
-    set.add(k);
-  };
-  Object.keys(people ?? {}).forEach(add);
-  (messages ?? []).forEach((m) => add(m.author));
-  return [...set];
+/**
+ * 이 여행에 내 프로필 스냅샷을 등록해 둔다 (참여자 목록·멘션 대상에 잡히도록).
+ * 채팅을 안 열어봐도 앱을 켜면 참여자로 표시됨 → "소리 없이 보는" 상황 방지.
+ */
+export function useRegisterMe() {
+  const projectId = useAppStore((s) => s.activeProjectId);
+  const me = useMyName();
+  const profile = useAppStore((s) => s.profile);
+  const cloudUser = useAppStore((s) => s.cloudUser);
+  const mutate = useAppStore((s) => s.mutate);
+
+  useEffect(() => {
+    if (!projectId) return;
+    const cur = useAppStore.getState().present[projectId]?.people ?? {};
+    const wantAvatar = profile.avatarDataUrl || cloudUser?.avatar || null;
+    const staleKeys = [cloudUser?.name, profile.displayName, '나'].filter(
+      (n): n is string => !!n && n !== me && !!cur[n],
+    );
+    if (cur[me]?.name === me && cur[me]?.avatar === wantAvatar && !staleKeys.length) return;
+    mutate((doc) => {
+      doc.people = doc.people ?? {};
+      for (const k of staleKeys) delete doc.people[k];
+      doc.people[me] = {
+        ...(doc.people[me] ?? { bg: null, statusMessage: '' }),
+        name: me,
+        avatar: wantAvatar,
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, me, profile.avatarDataUrl, cloudUser?.avatar]);
 }
