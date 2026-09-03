@@ -56,6 +56,7 @@ export interface TimelineItem {
   comments?: TimelineComment[];
 }
 
+/** 참여자 댓글 — 타임라인·장소·맛집·숙소 모달 공용 */
 export interface TimelineComment {
   id: string;
   author: string;
@@ -63,6 +64,7 @@ export interface TimelineComment {
   /** epoch ms */
   at: number;
 }
+export type EntryComment = TimelineComment;
 
 export type RestaurantCategory =
   | '현지식' | '커리' | '카페' | '뷔페' | '베이커리'
@@ -89,6 +91,8 @@ export interface Restaurant {
   menu?: string;
   /** 사용자가 직접 추가한 항목이면 true */
   custom?: boolean;
+  /** 상세 모달 댓글 */
+  comments?: EntryComment[];
 }
 
 /** 숙소 후보 (MY 탭 여행 정보 / 맛집 탭 보조 시드) */
@@ -103,6 +107,8 @@ export interface Hotel {
   nearby: string;
   feature: string;
   breakfast: string;
+  /** 상세 모달 댓글 */
+  comments?: EntryComment[];
 }
 
 /** 추천 관광지 (일정/동선 탭 시드) */
@@ -114,6 +120,8 @@ export interface Spot {
   area: string;
   tip: string;
   nearby: string;
+  /** 상세 모달 댓글 */
+  comments?: EntryComment[];
 }
 
 export type TodoPriority = 'high' | 'mid' | 'low';

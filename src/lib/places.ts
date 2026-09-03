@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Hotel } from '../types';
+import type { EntryComment, Hotel } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
 /**
@@ -30,6 +30,7 @@ export interface Place {
   note?: string;
   menu?: string;
   mapUrl?: string;
+  comments?: EntryComment[];
 }
 
 // 숙소 주소 → 한국식 구역명 (RestaurantsTab 에서 이동)
@@ -63,7 +64,7 @@ export function usePlaces(): Place[] {
     for (const sp of spots) {
       out.push({
         id: sp.id, kind: 'landmark', name: sp.name, area: sp.area,
-        category: sp.category || '관광지', note: sp.tip,
+        category: sp.category || '관광지', note: sp.tip, comments: sp.comments,
         mapUrl: `https://maps.google.com/?q=${encodeURIComponent(sp.name + ' Hanoi')}`,
       });
     }
@@ -72,6 +73,7 @@ export function usePlaces(): Place[] {
         id: r.id, kind: 'food', name: r.nameKo || r.name, origName: r.name, area: r.area,
         category: r.category || '기타', priceText: r.priceVndText || undefined,
         priceValue: r.priceVndAvg || undefined, note: r.note, menu: r.menu, mapUrl: r.mapUrl,
+        comments: r.comments,
       });
     }
     for (const h of hotels) {
@@ -80,6 +82,7 @@ export function usePlaces(): Place[] {
         category: h.grade || '숙소', priceText: h.priceTotalText || undefined,
         priceValue: won(h.priceTotalText), rating: h.rating, note: h.feature,
         mapUrl: `https://maps.google.com/?q=${encodeURIComponent(h.name + ' Hanoi')}`,
+        comments: h.comments,
       });
     }
     return out;

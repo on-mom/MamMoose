@@ -4,6 +4,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from './useAppStore';
+import { notifyNewComments } from '../lib/notify';
 import type { Project, TripDoc } from '../types';
 
 interface TripRow {
@@ -50,6 +51,9 @@ async function fetchTrips() {
   applyingRemote = true;
   useAppStore.getState().hydrateCloud(projects, docs);
   applyingRemote = false;
+
+  const st = useAppStore.getState();
+  notifyNewComments(docs, st.cloudUser?.name ?? '', !!st.settings.notifyMemories);
 }
 
 /** 첫 로그인: 현재 로컬 활성 여행을 클라우드로 1회 올린다 (루프 방지: bootstrapTried) */

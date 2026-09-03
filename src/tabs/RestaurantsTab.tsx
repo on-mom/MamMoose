@@ -8,9 +8,11 @@ import { uid } from '../lib/uid';
 import { commas } from '../lib/currency';
 import { coordsForArea, AREA_COORDS } from '../lib/areaCoords';
 import { geocode } from '../lib/geocode';
+import { useMyName } from '../lib/members';
 import Modal from '../components/Modal';
 import DataTable, { type Column } from '../components/DataTable';
 import PlaceMap, { type MapPoint } from '../components/PlaceMap';
+import CommentThread from '../components/CommentThread';
 import { accessForArea, fmtVnd } from '../lib/hanoiAccess';
 
 // 구역 토큰 분리: "바딘/올드쿼터", "바딘 · 올드쿼터", "바딘, 올드쿼터" 모두 개별 칩으로
@@ -53,6 +55,7 @@ function FoodView() {
   const project = useActiveProject()!;
   const list = useAppStore((s) => s.present[s.activeProjectId]?.restaurants ?? []);
   const mutate = useAppStore((s) => s.mutate);
+  const me = useMyName();
 
   const categories = useMemo(
     () => ['전체', ...Array.from(new Set(list.map((r) => r.category)))],
@@ -68,7 +71,8 @@ function FoodView() {
   const [cat, setCat] = useState('전체');
   const [areaSel, setAreaSel] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
-  const [detail, setDetail] = useState<Restaurant | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = detailId ? list.find((r) => r.id === detailId) ?? null : null;
   const [selected, setSelected] = useState<string | null>(null);
   const [geo, setGeo] = useState<Record<string, { lat: number; lng: number }>>({});
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -121,7 +125,7 @@ function FoodView() {
       get: (r) => disp(r),
       render: (r) => (
         <button
-          onClick={(e) => { e.stopPropagation(); setDetail(r); }}
+          onClick={(e) => { e.stopPropagation(); setDetailId(r.id); }}
           className="max-w-full truncate text-left font-medium text-white"
         >
           {disp(r)}
@@ -233,7 +237,7 @@ function FoodView() {
       {/* 상세 팝업 */}
       {detail && (
         <Modal
-          onClose={() => setDetail(null)}
+          onClose={() => setDetailId(null)}
           title={
             <>
               <div className="font-title text-lg font-bold leading-tight text-white">{disp(detail)}</div>
@@ -261,7 +265,7 @@ function FoodView() {
               </a>
               {detail.custom && (
                 <button
-                  onClick={() => { remove(detail.id); setDetail(null); }}
+                  onClick={() => { remove(detail.id); setDetailId(null); }}
                   className="rounded-xl border border-white/10 px-3 text-slate-400"
                 >
                   <X size={15} />
@@ -298,6 +302,18 @@ function FoodView() {
                 {detail.note}
               </div>
             )}
+
+            <CommentThread
+              comments={detail.comments}
+              onAdd={(t) => mutate((doc) => {
+                const row = doc.restaurants.find((x) => x.id === detail.id);
+                if (row) (row.comments ??= []).push({ id: uid(), author: me, text: t, at: Date.now() });
+              })}
+              onDelete={(cid) => mutate((doc) => {
+                const row = doc.restaurants.find((x) => x.id === detail.id);
+                if (row?.comments) row.comments = row.comments.filter((c) => c.id !== cid);
+              })}
+            />
           </div>
         </Modal>
       )}
@@ -370,7 +386,10 @@ const hotelArea = (h: Hotel): string => {
 
 function StayView() {
   const hotels = useAppStore((s) => s.present[s.activeProjectId]?.hotels ?? []);
-  const [detail, setDetail] = useState<Hotel | null>(null);
+  const mutate = useAppStore((s) => s.mutate);
+  const me = useMyName();
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = detailId ? hotels.find((h) => h.id === detailId) ?? null : null;
   const access = detail ? accessForArea(hotelArea(detail)) : null;
 
   const cols: Column<Hotel>[] = [
@@ -398,11 +417,11 @@ function StayView() {
         columns={cols}
         rowKey={(h) => h.id}
         selectedKey={detail?.id ?? null}
-        onRowClick={setDetail}
+        onRowClick={(h) => setDetailId(h.id)}
       />
       {detail && (
         <Modal
-          onClose={() => setDetail(null)}
+          onClose={() => setDetailId(null)}
           title={
             <>
               <div className="font-title text-lg font-bold leading-tight text-white">{detail.name}</div>
@@ -461,6 +480,18 @@ function StayView() {
                 </div>
               </div>
             )}
+
+            <CommentThread
+              comments={detail.comments}
+              onAdd={(t) => mutate((doc) => {
+                const row = doc.hotels.find((x) => x.id === detail.id);
+                if (row) (row.comments ??= []).push({ id: uid(), author: me, text: t, at: Date.now() });
+              })}
+              onDelete={(cid) => mutate((doc) => {
+                const row = doc.hotels.find((x) => x.id === detail.id);
+                if (row?.comments) row.comments = row.comments.filter((c) => c.id !== cid);
+              })}
+            />
           </div>
         </Modal>
       )}

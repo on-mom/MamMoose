@@ -17,7 +17,8 @@ import { coordsForArea } from '../lib/areaCoords';
 import { useMemberNames, useMyName } from '../lib/members';
 import { usePlaces } from '../lib/places';
 import Modal from '../components/Modal';
-import PlaceFilter from '../components/PlaceFilter';
+import { PlaceFilterControls, applyPlaceFilter, emptyFilterState, type PlaceFilterState } from '../components/PlaceFilter';
+import CommentThread from '../components/CommentThread';
 import { DiaryQuickWrite } from './DiaryView';
 
 const COL = 'col-'; // droppable 접두사
@@ -49,6 +50,7 @@ export default function TimelineView() {
   const days = tripDays(project.startDate, project.endDate);
   const [picker, setPicker] = useState(false);
   const [pickerDay, setPickerDay] = useState(1);
+  const [pickFilter, setPickFilter] = useState<PlaceFilterState>(emptyFilterState);
   const [mode, setMode] = useState<'read' | 'edit'>('read');
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -204,26 +206,23 @@ export default function TimelineView() {
                 </button>
               ))}
             </div>
-            <PlaceFilter
-              places={places}
-              compact
-              render={(filtered) => (
-                <div className="max-h-64 space-y-1 overflow-y-auto">
-                  {filtered.slice(0, 60).map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => addPlace(p.name, p.area, p.menu || p.note || '')}
-                      className="flex w-full items-center gap-2 rounded-lg bg-white/[0.03] px-2.5 py-2 text-left text-xs hover:bg-white/[0.06]"
-                    >
-                      <Plus size={13} className="shrink-0 text-moose-heart" />
-                      <span className="min-w-0 flex-1 truncate text-slate-200">{p.name}</span>
-                      <span className="shrink-0 text-[10px] text-slate-500">{p.area}</span>
-                    </button>
-                  ))}
-                  {filtered.length === 0 && <p className="py-6 text-center text-[11px] text-slate-600">조건에 맞는 장소가 없어요</p>}
-                </div>
+            <PlaceFilterControls places={places} state={pickFilter} onChange={setPickFilter} />
+            <div className="max-h-56 space-y-1 overflow-y-auto">
+              {applyPlaceFilter(places, pickFilter).slice(0, 60).map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => addPlace(p.name, p.area, p.menu || p.note || '')}
+                  className="flex w-full items-center gap-2 rounded-lg bg-white/[0.03] px-2.5 py-2 text-left text-xs hover:bg-white/[0.06]"
+                >
+                  <Plus size={13} className="shrink-0 text-moose-heart" />
+                  <span className="min-w-0 flex-1 truncate text-slate-200">{p.name}</span>
+                  <span className="shrink-0 text-[10px] text-slate-500">{p.area}</span>
+                </button>
+              ))}
+              {applyPlaceFilter(places, pickFilter).length === 0 && (
+                <p className="py-6 text-center text-[11px] text-slate-600">조건에 맞는 장소가 없어요</p>
               )}
-            />
+            </div>
             <p className="text-center text-[10px] text-slate-600">담으면 {pickerDay}일차에 추가돼요 · 시간·순서는 드래그로 조정</p>
           </div>
         </Modal>
@@ -378,9 +377,7 @@ function ItemDetailModal({ item, onClose }: { item: TimelineItem; onClose: () =>
   const mutate = useAppStore((s) => s.mutate);
   const me = useMyName();
   const members = useMemberNames();
-  const [text, setText] = useState('');
   const likes = item.likes ?? [];
-  const comments = item.comments ?? [];
   const iLike = likes.includes(me);
   const everyone = members.length > 0 && members.every((m) => likes.includes(m));
 
@@ -393,15 +390,6 @@ function ItemDetailModal({ item, onClose }: { item: TimelineItem; onClose: () =>
       set.has(me) ? set.delete(me) : set.add(me);
       it.likes = [...set];
     });
-  const addComment = () => {
-    if (!text.trim()) return;
-    patchItem((it) => {
-      (it.comments ??= []).push({ id: uid(), author: me, text: text.trim(), at: Date.now() });
-    });
-    setText('');
-  };
-  const delComment = (cid: string) =>
-    patchItem((it) => { if (it.comments) it.comments = it.comments.filter((c) => c.id !== cid); });
 
   return (
     <Modal
@@ -430,34 +418,11 @@ function ItemDetailModal({ item, onClose }: { item: TimelineItem; onClose: () =>
           {likes.length > 0 && <span className="text-[11px] text-slate-400">{likes.join(' · ')}</span>}
         </div>
 
-        <div className="space-y-2">
-          <div className="text-[11px] font-semibold text-slate-500">코멘트 {comments.length > 0 && `· ${comments.length}`}</div>
-          {comments.map((c) => (
-            <div key={c.id} className="group flex items-start gap-2 rounded-lg bg-white/[0.03] px-2.5 py-1.5">
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-semibold text-slate-300">{c.author}</div>
-                <div className="text-[13px] text-slate-100">{c.text}</div>
-              </div>
-              {c.author === me && (
-                <button onClick={() => delComment(c.id)} className="shrink-0 text-slate-600 hover:text-rose-400">
-                  <Trash2 size={12} />
-                </button>
-              )}
-            </div>
-          ))}
-          <div className="flex gap-2">
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addComment()}
-              placeholder="코멘트 남기기"
-              className="min-w-0 flex-1 rounded-lg bg-moose-edge px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600"
-            />
-            <button onClick={addComment} disabled={!text.trim()} className="btn-heart shrink-0 rounded-lg px-3 text-sm font-semibold disabled:opacity-40">
-              등록
-            </button>
-          </div>
-        </div>
+        <CommentThread
+          comments={item.comments}
+          onAdd={(t) => patchItem((it) => { (it.comments ??= []).push({ id: uid(), author: me, text: t, at: Date.now() }); })}
+          onDelete={(cid) => patchItem((it) => { if (it.comments) it.comments = it.comments.filter((c) => c.id !== cid); })}
+        />
       </div>
     </Modal>
   );

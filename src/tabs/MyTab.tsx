@@ -600,10 +600,10 @@ function Settings() {
       <section className="card p-3">
         <label className="flex items-center justify-between gap-2">
           <span>
-            <span className="font-semibold text-white">여행 후 추억함 알림</span>
+            <span className="font-semibold text-white">동행자 알림</span>
             <span className="mt-0.5 block text-[11px] text-slate-500">
               {canNotify()
-                ? '여행이 끝나면 “둘이 함께 좋아한 곳” 알림을 보내드려요'
+                ? '동행자가 코멘트를 남기거나, 여행이 끝나 추억함이 채워지면 알림'
                 : '이 브라우저는 알림을 지원하지 않아요'}
             </span>
           </span>

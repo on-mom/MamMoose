@@ -34,3 +34,42 @@ export const alreadyNotified = (tripId: string) => {
 export const markNotified = (tripId: string) => {
   try { localStorage.setItem(KEY(tripId), '1'); } catch { /* private mode */ }
 };
+
+// ---------- 코멘트 알림 ----------
+const SEEN_KEY = 'mammoose-seen-comments';
+const loadSeen = (): Set<string> => {
+  try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); } catch { return new Set(); }
+};
+const saveSeen = (s: Set<string>) => {
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify([...s].slice(-800))); } catch { /* noop */ }
+};
+
+type WithComments = { comments?: { id: string; author: string; text: string }[] };
+type DocLike = { timeline?: WithComments[]; restaurants?: WithComments[]; hotels?: WithComments[]; spots?: WithComments[] };
+
+/**
+ * 클라우드에서 받은 문서들을 훑어, 내가 처음 보는 + 남이 쓴 코멘트가 있으면 알림.
+ * 첫 호출(seed)에서는 알림 없이 기존 코멘트를 "본 것"으로 기록만 한다.
+ */
+export function notifyNewComments(docs: Record<string, DocLike>, myName: string, enabled: boolean) {
+  let seededBefore = false;
+  try { seededBefore = localStorage.getItem(SEEN_KEY) !== null; } catch { /* noop */ }
+  const seen = loadSeen();
+  const fresh: { author: string; text: string }[] = [];
+
+  for (const doc of Object.values(docs)) {
+    for (const arr of [doc.timeline, doc.restaurants, doc.hotels, doc.spots]) {
+      for (const row of arr ?? []) {
+        for (const c of row.comments ?? []) {
+          if (seen.has(c.id)) continue;
+          seen.add(c.id);
+          if (seededBefore && enabled && c.author && c.author !== myName) fresh.push(c);
+        }
+      }
+    }
+  }
+  saveSeen(seen);
+
+  if (fresh.length === 1) fireLocalNotification('맘무스 · 새 코멘트', `${fresh[0].author}: ${fresh[0].text}`);
+  else if (fresh.length > 1) fireLocalNotification('맘무스 · 새 코멘트', `동행자가 코멘트 ${fresh.length}개를 남겼어요`);
+}

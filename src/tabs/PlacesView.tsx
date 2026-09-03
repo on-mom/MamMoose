@@ -1,11 +1,18 @@
-import { useMemo, useRef, useState } from 'react';
-import { Plus, ExternalLink, Check } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Plus, ExternalLink, Check, Search, Map as MapIcon, X, Utensils } from 'lucide-react';
+import type { EntryComment, TripDoc } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
-import { usePlaces, splitAreas, KIND_LABEL, type Place } from '../lib/places';
+import { useMyName } from '../lib/members';
+import { usePlaces, splitAreas, KIND_LABEL, type Place, type PlaceKind } from '../lib/places';
 import { coordsForArea } from '../lib/areaCoords';
 import { geocode } from '../lib/geocode';
-import PlaceFilter from '../components/PlaceFilter';
+import {
+  PlaceFilterControls, applyPlaceFilter, filterSummary, emptyFilterState, type PlaceFilterState,
+} from '../components/PlaceFilter';
+import { BottomSheet } from '../components/Modal';
+import Modal from '../components/Modal';
+import CommentThread from '../components/CommentThread';
 import PlaceMap, { type MapPoint } from '../components/PlaceMap';
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
@@ -16,48 +23,99 @@ const jitter = (id: string) => {
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
   return { dlat: ((h % 100) / 100 - 0.5) * 0.012, dlng: (((h >> 8) % 100) / 100 - 0.5) * 0.012 };
 };
+const arrOf = (kind: PlaceKind): keyof TripDoc =>
+  kind === 'landmark' ? 'spots' : kind === 'food' ? 'restaurants' : 'hotels';
 
-/** 일정 › 장소 — 관광지·맛집·숙소 통합 뷰. 1·2·3차 필터 + 지도 + 타임라인 담기. */
+/** 일정 › 장소 — 검색 시트 + 결과 + 다중선택 담기 + 상세(댓글). */
 export default function PlacesView() {
   const project = useActiveProject()!;
   const places = usePlaces();
   const mutate = useAppStore((s) => s.mutate);
+  const me = useMyName();
   const days = tripDays(project.startDate, project.endDate);
-  const [day, setDay] = useState(1);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [added, setAdded] = useState<Set<string>>(new Set());
-  const [geo, setGeo] = useState<Record<string, { lat: number; lng: number }>>({});
-  const mapRef = useRef<HTMLDivElement | null>(null);
 
-  const addToTimeline = (p: Place) => {
+  const [filter, setFilter] = useState<PlaceFilterState>(emptyFilterState);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [day, setDay] = useState(1);
+  const [selMode, setSelMode] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [added, setAdded] = useState<Set<string>>(new Set());
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
+  const [mapSel, setMapSel] = useState<string | null>(null);
+  const [geo, setGeo] = useState<Record<string, { lat: number; lng: number }>>({});
+
+  const results = useMemo(() => applyPlaceFilter(places, filter), [places, filter]);
+  const detail = detailId ? places.find((p) => p.id === detailId) ?? null : null;
+
+  const addOne = (p: Place, d = day) => {
     mutate((doc) => {
-      const order = doc.timeline.filter((i) => i.day === day).length;
+      const order = doc.timeline.filter((i) => i.day === d).length;
       const c = p.area ? coordsForArea(p.area) : null;
       doc.timeline.push({
-        id: uid(), projectId: project.id, day, order,
+        id: uid(), projectId: project.id, day: d, order,
         startTime: '10:00', durationMin: p.kind === 'stay' ? 0 : 60,
-        place: p.name, lat: c?.lat ?? null, lng: c?.lng ?? null,
-        memo: p.menu || p.note || '',
+        place: p.name, lat: c?.lat ?? null, lng: c?.lng ?? null, memo: p.menu || p.note || '',
       });
     });
-    navigator.vibrate?.(10);
+    navigator.vibrate?.(8);
     setAdded((s) => new Set(s).add(p.id));
   };
-
-  const pickRow = (p: Place) => {
-    setSelected(p.id);
-    mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    if (!geo[p.id] && KEY) {
-      geocode(p.origName || p.name).then((r) => { if (r) setGeo((m) => ({ ...m, [p.id]: r })); });
-    }
+  const addPicked = () => {
+    const list = results.filter((p) => picked.has(p.id));
+    mutate((doc) => {
+      let order = doc.timeline.filter((i) => i.day === day).length;
+      for (const p of list) {
+        const c = p.area ? coordsForArea(p.area) : null;
+        doc.timeline.push({
+          id: uid(), projectId: project.id, day, order: order++,
+          startTime: '10:00', durationMin: p.kind === 'stay' ? 0 : 60,
+          place: p.name, lat: c?.lat ?? null, lng: c?.lng ?? null, memo: p.menu || p.note || '',
+        });
+      }
+    });
+    navigator.vibrate?.(12);
+    setAdded((s) => new Set([...s, ...list.map((p) => p.id)]));
+    setPicked(new Set());
+    setSelMode(false);
   };
+  const toggle = (id: string) =>
+    setPicked((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  // 상세 모달의 댓글은 원본 엔티티(spots/restaurants/hotels)에 저장
+  const patchComments = (p: Place, fn: (list: EntryComment[]) => EntryComment[]) =>
+    mutate((doc) => {
+      const arr = doc[arrOf(p.kind)] as Array<{ id: string; comments?: EntryComment[] }>;
+      const row = arr.find((x) => x.id === p.id);
+      if (row) row.comments = fn(row.comments ?? []);
+    });
+
+  const points: MapPoint[] = useMemo(
+    () => results.slice(0, 80).map((p) => {
+      const g = geo[p.id];
+      if (g) return { id: p.id, lat: g.lat, lng: g.lng };
+      const c = coordsForArea(p.area);
+      const j = jitter(p.id);
+      return { id: p.id, lat: c.lat + j.dlat, lng: c.lng + j.dlng };
+    }),
+    [results, geo],
+  );
 
   return (
-    <div className="edge space-y-3 py-3">
-      <div className="flex items-center gap-2">
-        <h2 className="font-title text-lg font-bold text-white">장소 둘러보기</h2>
-        <span className="text-[11px] text-slate-500">담기 →</span>
-        <div className="no-scrollbar flex flex-1 gap-1 overflow-x-auto">
+    <div className="edge space-y-2.5 py-3">
+      {/* 검색 바 */}
+      <button
+        onClick={() => setSheetOpen(true)}
+        className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-moose-dusk/70 px-3 py-2.5 text-left"
+      >
+        <Search size={15} className="shrink-0 text-moose-heart" />
+        <span className="min-w-0 flex-1 truncate text-[13px] text-slate-200">{filterSummary(filter)}</span>
+        <span className="shrink-0 text-[11px] text-slate-500">{results.length}곳</span>
+      </button>
+
+      {/* 액션 줄 */}
+      <div className="flex items-center justify-between text-xs">
+        <div className="no-scrollbar flex gap-1 overflow-x-auto">
           {Array.from({ length: days }, (_, i) => i + 1).map((d) => (
             <button
               key={d}
@@ -68,105 +126,201 @@ export default function PlacesView() {
             </button>
           ))}
         </div>
+        <div className="flex shrink-0 items-center gap-2 pl-2">
+          <button onClick={() => setShowMap((v) => !v)} className={`flex items-center gap-0.5 ${showMap ? 'text-moose-heart' : 'text-slate-400'}`}>
+            <MapIcon size={13} /> 지도
+          </button>
+          <button
+            onClick={() => { setSelMode((v) => !v); setPicked(new Set()); }}
+            className={selMode ? 'text-moose-heart' : 'text-slate-400'}
+          >
+            {selMode ? '선택 취소' : '다중선택'}
+          </button>
+        </div>
       </div>
 
-      <PlaceFilter
-        places={places}
-        render={(filtered) => (
-          <PlacesResult
-            filtered={filtered}
-            selected={selected}
-            geo={geo}
-            added={added}
-            mapRef={mapRef}
-            onPick={pickRow}
-            onAdd={addToTimeline}
-          />
-        )}
-      />
-    </div>
-  );
-}
+      {showMap && (
+        <PlaceMap
+          points={points}
+          selectedId={mapSel}
+          onSelect={(id) => {
+            setMapSel(id);
+            const p = results.find((x) => x.id === id);
+            if (p && !geo[id] && KEY) geocode(p.origName || p.name).then((r) => { if (r) setGeo((m) => ({ ...m, [id]: r })); });
+          }}
+          height="160px"
+          hint="장소 미니맵 · 핀을 누르면 강조"
+        />
+      )}
 
-function PlacesResult({
-  filtered, selected, geo, added, mapRef, onPick, onAdd,
-}: {
-  filtered: Place[];
-  selected: string | null;
-  geo: Record<string, { lat: number; lng: number }>;
-  added: Set<string>;
-  mapRef: React.RefObject<HTMLDivElement>;
-  onPick: (p: Place) => void;
-  onAdd: (p: Place) => void;
-}) {
-  const points: MapPoint[] = useMemo(
-    () => filtered.slice(0, 80).map((p) => {
-      const g = geo[p.id];
-      if (g) return { id: p.id, lat: g.lat, lng: g.lng };
-      const c = coordsForArea(p.area);
-      const j = jitter(p.id);
-      return { id: p.id, lat: c.lat + j.dlat, lng: c.lng + j.dlng };
-    }),
-    [filtered, geo],
-  );
-
-  return (
-    <>
-      <div ref={mapRef}>
-        <PlaceMap points={points} selectedId={selected} onSelect={(id) => {
-          const p = filtered.find((x) => x.id === id);
-          if (p) onPick(p);
-        }} height="150px" hint="장소 미니맵 · 목록을 누르면 위치 강조" />
-      </div>
-
-      <div className="text-[11px] text-slate-500">{filtered.length}곳</div>
-
+      {/* 결과 */}
       <div className="space-y-1.5">
-        {filtered.map((p) => (
+        {results.map((p) => (
           <div
             key={p.id}
-            onClick={() => onPick(p)}
+            onClick={() => (selMode ? toggle(p.id) : setDetailId(p.id))}
             className={`flex cursor-pointer items-center gap-2 rounded-xl border p-2.5 transition ${
-              p.id === selected ? 'border-moose-heart/40 bg-moose-heart/10' : 'border-white/5 bg-moose-dusk/70 hover:bg-white/[0.05]'
+              picked.has(p.id) ? 'border-moose-heart bg-moose-heart/10' : 'border-white/5 bg-moose-dusk/70 hover:bg-white/[0.05]'
             }`}
           >
+            {selMode && (
+              <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+                picked.has(p.id) ? 'border-moose-heart bg-moose-heart text-white' : 'border-white/20'
+              }`}>
+                {picked.has(p.id) && <Check size={13} />}
+              </span>
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="truncate text-sm font-semibold text-white">{p.name}</span>
                 {p.rating ? <span className="shrink-0 text-[10px] text-slate-400">★ {p.rating}</span> : null}
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-slate-500">
-                <span className="rounded bg-white/5 px-1.5 py-0.5">{KIND_LABEL[p.kind].split('·')[0]}</span>
                 <span className="rounded bg-white/5 px-1.5 py-0.5">{p.category}</span>
                 {p.area && <span>📍 {splitAreas(p.area).join(' · ')}</span>}
                 {p.priceText && <span>· {p.priceText}</span>}
               </div>
             </div>
-            {p.mapUrl && (
-              <a
-                href={p.mapUrl}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="shrink-0 text-slate-500 hover:text-moose-heart"
-              >
-                <ExternalLink size={13} />
-              </a>
+            {!selMode && (
+              <>
+                {p.mapUrl && (
+                  <a href={p.mapUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                    className="shrink-0 text-slate-500 hover:text-moose-heart"><ExternalLink size={13} /></a>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); addOne(p); }}
+                  className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold ${
+                    added.has(p.id) ? 'bg-emerald-500/20 text-emerald-300' : 'btn-heart'
+                  }`}
+                >
+                  {added.has(p.id) ? <Check size={13} /> : <Plus size={13} />}
+                </button>
+              </>
             )}
-            <button
-              onClick={(e) => { e.stopPropagation(); onAdd(p); }}
-              className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold ${
-                added.has(p.id) ? 'bg-emerald-500/20 text-emerald-300' : 'btn-heart'
-              }`}
-            >
-              {added.has(p.id) ? <Check size={13} /> : <Plus size={13} />}
-            </button>
           </div>
         ))}
-        {filtered.length === 0 && (
-          <p className="py-10 text-center text-xs text-slate-600">조건에 맞는 장소가 없어요</p>
-        )}
+        {results.length === 0 && <p className="py-10 text-center text-xs text-slate-600">조건에 맞는 장소가 없어요</p>}
       </div>
-    </>
+
+      {/* 다중선택 담기 바 */}
+      {selMode && picked.size > 0 && (
+        <div className="sticky bottom-2 z-10 flex items-center gap-2 rounded-xl bg-moose-heart px-3 py-2 text-sm font-semibold text-white shadow-lg">
+          <span className="flex-1">{picked.size}곳 선택</span>
+          <select
+            value={day}
+            onChange={(e) => setDay(Number(e.target.value))}
+            className="rounded-md bg-white/20 px-2 py-1 text-xs outline-none"
+          >
+            {Array.from({ length: days }, (_, i) => i + 1).map((d) => (
+              <option key={d} value={d} className="bg-moose-edge">{d}일차</option>
+            ))}
+          </select>
+          <button onClick={addPicked} className="rounded-md bg-white px-3 py-1 text-xs text-moose-berry">담기</button>
+        </div>
+      )}
+
+      {/* 검색 시트 */}
+      {sheetOpen && (
+        <PlaceSearchSheet
+          places={places}
+          initial={filter}
+          onClose={() => setSheetOpen(false)}
+          onApply={(f) => { setFilter(f); setSheetOpen(false); }}
+        />
+      )}
+
+      {/* 상세 모달 */}
+      {detail && (
+        <Modal
+          onClose={() => setDetailId(null)}
+          title={
+            <>
+              <div className="font-title text-base font-bold text-white">{detail.name}</div>
+              <div className="mt-0.5 text-[12px] text-slate-400">
+                {[
+                  KIND_LABEL[detail.kind].split('·')[0],
+                  detail.category !== KIND_LABEL[detail.kind].split('·')[0] ? detail.category : null,
+                  detail.area ? splitAreas(detail.area).join(' · ') : null,
+                ].filter(Boolean).join(' · ')}
+              </div>
+            </>
+          }
+          footer={
+            <div className="flex gap-2">
+              {detail.mapUrl && (
+                <a href={detail.mapUrl} target="_blank" rel="noreferrer"
+                  className="flex items-center justify-center rounded-xl border border-white/10 px-3 text-slate-300">
+                  <ExternalLink size={15} />
+                </a>
+              )}
+              <button
+                onClick={() => addOne(detail)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold ${
+                  added.has(detail.id) ? 'bg-emerald-500/20 text-emerald-300' : 'btn-heart'
+                }`}
+              >
+                {added.has(detail.id) ? <><Check size={15} /> {day}일차에 담음</> : <><Plus size={15} /> {day}일차에 담기</>}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            {detail.rating ? <div className="text-[13px] text-slate-300">★ {detail.rating}</div> : null}
+            {detail.menu && (
+              <div className="flex gap-2 rounded-xl bg-moose-heart/10 p-3">
+                <Utensils size={15} className="mt-0.5 shrink-0 text-moose-heart" />
+                <div>
+                  <div className="text-[11px] font-semibold text-moose-heart">추천 메뉴</div>
+                  <div className="text-[13px] text-slate-100">{detail.menu}</div>
+                </div>
+              </div>
+            )}
+            {detail.priceText && (
+              <div className="rounded-xl bg-white/[0.04] p-3 text-xs">
+                <div className="text-slate-500">가격</div>
+                <div className="text-sm font-semibold text-slate-100">{detail.priceText}</div>
+              </div>
+            )}
+            {detail.note && <div className="text-[13px] leading-relaxed text-slate-300">{detail.note}</div>}
+
+            <CommentThread
+              comments={detail.comments}
+              onAdd={(t) => patchComments(detail, (list) => [...list, { id: uid(), author: me, text: t, at: Date.now() }])}
+              onDelete={(cid) => patchComments(detail, (list) => list.filter((c) => c.id !== cid))}
+            />
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function PlaceSearchSheet({
+  places, initial, onClose, onApply,
+}: {
+  places: Place[];
+  initial: PlaceFilterState;
+  onClose: () => void;
+  onApply: (f: PlaceFilterState) => void;
+}) {
+  const [draft, setDraft] = useState<PlaceFilterState>(initial);
+  const count = applyPlaceFilter(places, draft).length;
+  return (
+    <BottomSheet title="장소 검색" onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-[11px] text-slate-500">
+          지역·종류 중 하나만 골라도 되고, 둘 다 좁혀도 됩니다. 정하고 아래 [검색하기].
+        </p>
+        <PlaceFilterControls places={places} state={draft} onChange={setDraft} />
+        <div className="flex gap-2 pt-1">
+          <button onClick={() => setDraft(emptyFilterState)} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-slate-300">
+            <X size={15} />
+          </button>
+          <button onClick={() => onApply(draft)} className="btn-heart flex-1 rounded-xl py-2.5 text-sm font-semibold">
+            {count}곳 검색하기
+          </button>
+        </div>
+      </div>
+    </BottomSheet>
   );
 }
