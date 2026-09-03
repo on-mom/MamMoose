@@ -1,0 +1,94 @@
+<title>맘무스 웹 푸시 배포 가이드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --ground:#faf7f8;--surface:#fff;--surface-2:#f5eef1;--ink:#241f26;--ink-soft:#6c6472;
+    --ink-faint:#948a99;--border:#e9e1e5;--accent:#c4437f;--accent-fill:#e2679f;
+    --ok:#2c9c6d;--warn:#c98a1e;--shadow:0 1px 2px rgba(36,31,38,.05),0 10px 30px -14px rgba(36,31,38,.14);
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --ground:#161319;--surface:#201c25;--surface-2:#29232f;--ink:#ece7ee;--ink-soft:#a99fb3;
+    --ink-faint:#7c7286;--border:#342d3c;--accent:#f472b6;--accent-fill:#f472b6;
+    --ok:#48c48d;--warn:#e6b366;--shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px -16px rgba(0,0,0,.6);
+  }}
+  :root[data-theme="dark"]{
+    --ground:#161319;--surface:#201c25;--surface-2:#29232f;--ink:#ece7ee;--ink-soft:#a99fb3;
+    --ink-faint:#7c7286;--border:#342d3c;--accent:#f472b6;--accent-fill:#f472b6;
+    --ok:#48c48d;--warn:#e6b366;--shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px -16px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box}html{overflow-x:hidden}
+  body{margin:0;background:var(--ground);color:var(--ink);overflow-x:hidden;
+    font-family:"Noto Sans KR",system-ui,sans-serif;font-size:15px;line-height:1.72}
+  h1,h2{font-family:"IBM Plex Sans KR","Noto Sans KR",sans-serif;text-wrap:balance}
+  code,.mono{font-family:"IBM Plex Mono",monospace;font-size:.85em;background:var(--surface-2);padding:1px 5px;border-radius:4px;word-break:break-all}
+  pre{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.6}
+  header.top{border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--ground) 90%,transparent);position:sticky;top:0;z-index:5;backdrop-filter:blur(8px)}
+  .top-in{max-width:780px;margin:0 auto;padding:12px 22px;font-weight:600;font-size:14px}
+  .top-in span{color:var(--accent)}
+  .wrap{max-width:780px;margin:0 auto;padding:38px 22px 110px}
+  h1{font-size:23px;font-weight:700;letter-spacing:-.02em;margin:0 0 10px}
+  .lede{color:var(--ink-soft);margin:0 0 6px}
+  h2{font-size:17px;margin:36px 0 6px;padding-top:12px;border-top:2px solid var(--border)}
+  h2:first-of-type{border-top:none}
+  ol.steps{counter-reset:s;list-style:none;margin:10px 0;padding:0}
+  ol.steps>li{counter-increment:s;position:relative;padding:10px 0 10px 34px;border-top:1px solid var(--border);font-size:13.5px}
+  ol.steps>li:first-child{border-top:none}
+  ol.steps>li::before{content:counter(s);position:absolute;left:0;top:9px;width:22px;height:22px;border-radius:6px;
+    background:var(--accent-fill);color:#fff;font-family:"IBM Plex Mono";font-size:11px;font-weight:700;display:grid;place-items:center}
+  ol.steps b{color:var(--ink)}
+  a{color:var(--accent);word-break:break-all}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--ink-faint);font-weight:600}
+  td:first-child{font-family:"IBM Plex Mono";font-size:12px;white-space:nowrap}
+  .callout{margin:16px 0;padding:13px 16px;border-radius:10px;font-size:13px;background:var(--surface-2);border:1px solid var(--border);color:var(--ink-soft)}
+  .callout.ok{background:color-mix(in srgb,var(--ok) 12%,var(--surface));border-color:color-mix(in srgb,var(--ok) 30%,var(--border));color:var(--ink)}
+  .callout.warn{background:color-mix(in srgb,var(--warn) 12%,var(--surface));border-color:color-mix(in srgb,var(--warn) 32%,var(--border));color:var(--ink)}
+  .callout b{color:var(--ink)}
+  footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--border);font-size:12px;color:var(--ink-faint);text-align:center}
+</style>
+
+<header class="top"><div class="top-in">맘무스 <span>웹 푸시 배포 가이드</span> · 약 10분</div></header>
+
+<div class="wrap">
+  <h1>웹 푸시 — 마지막 배포 단계</h1>
+  <p class="lede">앱을 닫아도 오는 <b>@멘션 알림</b>을 켜려면 발송 함수 하나를 배포해야 해요. 클라이언트 코드와 함수 코드는 다 만들어뒀고, 아래 <b>붙여넣기 3번</b>이면 끝납니다.</p>
+  <p class="lede">이미 제가 해둔 것: Railway에 <code>VITE_VAPID_PUBLIC_KEY</code> 등록 · <code>push_subscriptions</code> 테이블 · SW 푸시 수신 코드 · "동행자 알림" 토글에 구독 등록 연결.</p>
+
+  <h2>A · SQL 한 줄 추가 (30초)</h2>
+  <p class="lede"><code>push_subscriptions</code>에 이름 컬럼을 추가합니다. Supabase → SQL Editor에 붙여넣고 RUN:</p>
+  <pre>alter table public.push_subscriptions add column if not exists display_name text;</pre>
+
+  <h2>B · Edge Function 배포 (5분)</h2>
+  <ol class="steps">
+    <li><a href="https://supabase.com/dashboard/project/jjrbzojkiurayxapkpor/functions" target="_blank" rel="noreferrer">Supabase → Edge Functions</a> → <b>Deploy a new function</b> (또는 "Via Editor")</li>
+    <li>함수 이름: <code>push-notify</code></li>
+    <li>기본 코드를 다 지우고, 리포의 <code>supabase/functions/push-notify/index.ts</code> 내용을 <b>전체 복사 → 붙여넣기</b>
+      <br><span style="color:var(--ink-faint);font-size:12px">GitHub: <a href="https://github.com/on-mom/MamMoose/blob/main/supabase/functions/push-notify/index.ts" target="_blank" rel="noreferrer">on-mom/MamMoose/…/push-notify/index.ts</a></span></li>
+    <li><b>Deploy</b> 클릭</li>
+  </ol>
+
+  <h2>C · 시크릿 3개 등록 (2분)</h2>
+  <p class="lede"><a href="https://supabase.com/dashboard/project/jjrbzojkiurayxapkpor/settings/functions" target="_blank" rel="noreferrer">Edge Functions → Secrets (Manage secrets)</a> 에서 <b>Add new secret</b> 3번:</p>
+  <div style="overflow-x:auto"><table>
+    <tr><th>이름</th><th>값</th></tr>
+    <tr><td>VAPID_PUBLIC_KEY</td><td><code>BGY_2mGYICECIe3SqYASdyfWhOVfAIn8Nyc_imv-9oAiJyP-5Hdnna1XxH6xlSmXfKz0gBygN9AxDj14_zGACSc</code></td></tr>
+    <tr><td>VAPID_PRIVATE_KEY</td><td>마음님이 <code>web-push generate-vapid-keys</code> 로 만든 <b>Private Key</b> (채팅에 보내주셨던 <code>rW7b…</code> 값)</td></tr>
+    <tr><td>VAPID_SUBJECT</td><td><code>mailto:heart@onmom-agency.com</code></td></tr>
+  </table></div>
+  <div class="callout warn"><b>개인키(Private Key)</b>는 이 시크릿 저장소에만 넣고, 다른 데(코드·채팅·메모 공유)엔 남기지 마세요. 여기 넣으면 아무도 다시 못 봅니다(정상).</div>
+
+  <h2>D · 확인 (1분)</h2>
+  <ol class="steps">
+    <li>배포된 앱에서 <b>MY → 설정 → "동행자 알림" 켜기</b> → 브라우저가 물으면 <b>허용</b></li>
+    <li>Supabase → Table Editor → <code>push_subscriptions</code> 에 방금 내 기기 행이 생겼는지 확인</li>
+    <li>두 분이 각자 폰에서 1·2를 하고, 한 명이 코멘트에 <b>@상대이름</b>을 넣어 등록 → 상대 폰에 알림이 오면 성공 🎉</li>
+  </ol>
+  <div class="callout"><b>iOS(아이폰)</b>는 사파리에서 <b>"홈 화면에 추가"로 앱을 설치한 상태</b>에서만 푸시가 옵니다. 안드로이드/데스크톱은 그냥 됩니다.</div>
+
+  <div class="callout ok"><b>배포 안 해도 되는 것</b> — @멘션 시 <b>앱을 켜 둔 상태</b>의 알림은 이미 동작합니다(실시간 동기화 + 로컬 알림). 위 배포는 "앱을 완전히 닫았을 때도" 오게 하는 단계예요. 급하지 않으면 나중에 하셔도 됩니다.</div>
+
+  <footer>맘무스 · 웹 푸시 배포 가이드 · 2026-09-03</footer>
+</div>
