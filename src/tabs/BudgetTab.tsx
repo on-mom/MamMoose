@@ -132,7 +132,7 @@ export default function BudgetTab() {
               <input
                 defaultValue={e.vendor}
                 onChange={(ev) => commitEdit(e.id, { vendor: ev.target.value })}
-                placeholder="지출처"
+                placeholder="어디에 썼나요"
                 className="min-w-0 flex-1 bg-transparent text-slate-100 outline-none"
               />
               <input
@@ -251,7 +251,7 @@ function AddForm({ projectId, rate, onDone }: { projectId: string; rate: number;
           placeholder="카테고리 직접 입력" className="w-full rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
       )}
       <input value={f.vendor} onChange={(e) => setF({ ...f, vendor: e.target.value })}
-        placeholder="지출처" className="w-full rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
+        placeholder="어디에 썼나요 (예: 쌀국수, 택시)" className="w-full rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
       <div className="flex items-center gap-2">
         <select
           value={cur}

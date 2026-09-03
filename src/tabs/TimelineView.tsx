@@ -618,7 +618,7 @@ function Card({
           defaultValue={item.place}
           onBlur={(e) => e.target.value !== item.place && patch({ place: e.target.value })}
           className="w-full bg-transparent text-sm font-semibold text-white outline-none"
-          placeholder="장소명"
+          placeholder="장소·일정 이름"
         />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
           <label className="flex items-center gap-1">
@@ -653,7 +653,7 @@ function Card({
           defaultValue={item.memo ?? ''}
           onBlur={(e) => e.target.value !== (item.memo ?? '') && patch({ memo: e.target.value })}
           className="w-full bg-transparent text-[11px] text-slate-400 outline-none placeholder:text-slate-700"
-          placeholder="메모"
+          placeholder="메모 (주소·예약번호·팁)"
         />
       </div>
       {!overlay && (
