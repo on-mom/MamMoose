@@ -14,12 +14,41 @@ function MapsBootstrap() {
   return null;
 }
 
-const hexToRgb = (hex: string) => {
+type RGB = [number, number, number];
+const parseHex = (hex: string): RGB => {
   const h = hex.replace('#', '');
   const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
   const n = parseInt(full, 16);
-  return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 };
+const triplet = ([r, g, b]: RGB) => `${Math.round(r)} ${Math.round(g)} ${Math.round(b)}`;
+const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+// 지각 밝기 (0~1)
+const luminance = ([r, g, b]: RGB) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+const THEME_VARS = ['--c-accent', '--c-bg', '--c-surface', '--c-surface-2', '--c-edge', '--c-fg', '--c-fg-dim'] as const;
+
+function applyTheme(accent?: string, bg?: string) {
+  const rootEl = document.documentElement;
+  const S = rootEl.style;
+  if (!accent && !bg) {
+    THEME_VARS.forEach((v) => S.removeProperty(v));
+    rootEl.removeAttribute('data-lighttheme');
+    return;
+  }
+  const acc = parseHex(accent ?? '#ee86a9');
+  const base = parseHex(bg ?? '#131019');
+  const light = luminance(base) > 0.55;
+  const fg: RGB = light ? [26, 24, 32] : [237, 237, 241];
+  S.setProperty('--c-accent', triplet(acc));
+  S.setProperty('--c-bg', triplet(base));
+  S.setProperty('--c-surface', triplet(mix(base, fg, light ? 0.05 : 0.07)));
+  S.setProperty('--c-surface-2', triplet(mix(base, fg, light ? 0.1 : 0.13)));
+  S.setProperty('--c-edge', triplet(mix(base, fg, 0.17)));
+  S.setProperty('--c-fg', triplet(fg));
+  S.setProperty('--c-fg-dim', triplet(mix(fg, base, 0.42)));
+  rootEl.toggleAttribute('data-lighttheme', light);
+}
 
 export default function App() {
   const unlocked = useAppStore((s) => s.unlocked);
@@ -28,13 +57,7 @@ export default function App() {
   useUndoRedoHotkeys();
   useEffect(() => { initCloudSync(); }, []);
 
-  useEffect(() => {
-    const root = document.documentElement.style;
-    if (themeAccent) root.setProperty('--c-accent', hexToRgb(themeAccent));
-    else root.removeProperty('--c-accent');
-    if (themeBg) root.setProperty('--c-bg', hexToRgb(themeBg));
-    else root.removeProperty('--c-bg');
-  }, [themeAccent, themeBg]);
+  useEffect(() => { applyTheme(themeAccent, themeBg); }, [themeAccent, themeBg]);
 
   return (
     <div className="h-full bg-moose-night">

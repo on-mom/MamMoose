@@ -17,8 +17,8 @@ export default {
           cream: '#f0e1c9', // 카라멜 크림 (하이라이트)
           cocoa: '#6b5344', // 발굽 브라운
           night: 'rgb(var(--c-bg) / <alpha-value>)', // 따뜻한 밤하늘 (배경)
-          dusk: '#1d1826', // 카드 표면
-          edge: '#302738', // 경계선
+          dusk: 'rgb(var(--c-surface) / <alpha-value>)', // 카드 표면
+          edge: 'rgb(var(--c-edge) / <alpha-value>)', // 경계선
         },
       },
       maxWidth: { mobile: '430px' },

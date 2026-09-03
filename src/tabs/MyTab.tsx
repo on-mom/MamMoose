@@ -11,6 +11,7 @@ import { createInvite, acceptInvite, deleteCloudTrip } from '../store/cloudSync'
 import { Moose } from '../components/Moose';
 import CoupleMoose from '../components/CoupleMoose';
 import Modal from '../components/Modal';
+import ColorPicker from '../components/ColorPicker';
 import { outboundText, inboundText, carrierOf } from '../lib/flight';
 import { CITY_TZ } from '../lib/cities';
 import DiaryView from './DiaryView';
@@ -718,6 +719,56 @@ function TripForm({ initial, onSubmit, onCancel }: {
   );
 }
 
+function ThemeSection({
+  settings, setTheme,
+}: {
+  settings: import('../types').AppSettings;
+  setTheme: (p: { themeAccent?: string; themeBg?: string }) => void;
+}) {
+  const [open, setOpen] = useState<'accent' | 'bg' | null>(null);
+  const accent = settings.themeAccent ?? '#ee86a9';
+  const bg = settings.themeBg ?? '#131019';
+  const custom = !!(settings.themeAccent || settings.themeBg);
+
+  const Row = ({ id, label, val }: { id: 'accent' | 'bg'; label: string; val: string }) => (
+    <div>
+      <button onClick={() => setOpen(open === id ? null : id)} className="flex w-full items-center justify-between py-1">
+        <span className="text-[13px] text-slate-300">{label}</span>
+        <span className="h-7 w-12 rounded-md border border-white/20" style={{ background: val }} />
+      </button>
+      {open === id && (
+        <div className="mt-2 rounded-xl bg-black/20 p-3">
+          <ColorPicker
+            value={val}
+            onChange={(hex) => setTheme(id === 'accent' ? { themeAccent: hex } : { themeBg: hex })}
+          />
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <section className="card space-y-1 p-3">
+      <div className="flex items-center justify-between pb-1">
+        <span className="font-semibold text-white">테마 색상</span>
+        {custom && (
+          <button
+            onClick={() => { setTheme({ themeAccent: undefined, themeBg: undefined }); setOpen(null); }}
+            className="text-[11px] text-slate-400"
+          >
+            기본값으로
+          </button>
+        )}
+      </div>
+      <Row id="accent" label="버튼 · 포인트 색" val={accent} />
+      <Row id="bg" label="배경 색" val={bg} />
+      <p className="pt-1 text-[10px] text-slate-600">
+        배경을 밝게 하면 글자색이 자동으로 어두워져요 · 이 색은 이 기기에만 적용돼요
+      </p>
+    </section>
+  );
+}
+
 function Settings() {
   const settings = useAppStore((s) => s.settings);
   const setPin = useAppStore((s) => s.setPin);
@@ -800,35 +851,7 @@ function Settings() {
         </label>
       </section>
 
-      <section className="card space-y-2.5 p-3">
-        <div className="flex items-center justify-between">
-          <span className="font-semibold text-white">테마 색상</span>
-          {(settings.themeAccent || settings.themeBg) && (
-            <button onClick={() => setTheme({ themeAccent: undefined, themeBg: undefined })} className="text-[11px] text-slate-400">
-              기본값으로
-            </button>
-          )}
-        </div>
-        <label className="flex items-center justify-between">
-          <span className="text-[13px] text-slate-300">버튼 · 포인트 색</span>
-          <input
-            type="color"
-            value={settings.themeAccent ?? '#ee86a9'}
-            onChange={(e) => setTheme({ themeAccent: e.target.value })}
-            className="h-8 w-14 rounded bg-transparent"
-          />
-        </label>
-        <label className="flex items-center justify-between">
-          <span className="text-[13px] text-slate-300">배경 색</span>
-          <input
-            type="color"
-            value={settings.themeBg ?? '#131019'}
-            onChange={(e) => setTheme({ themeBg: e.target.value })}
-            className="h-8 w-14 rounded bg-transparent"
-          />
-        </label>
-        <p className="text-[10px] text-slate-600">둘이 함께 쓰는 앱이라 이 색은 이 기기에만 적용돼요</p>
-      </section>
+      <ThemeSection settings={settings} setTheme={setTheme} />
 
       {!cloudUser && (
         <button onClick={lock} className="flex w-full items-center justify-center gap-2 rounded-xl border border-moose-edge py-3 text-slate-300">
