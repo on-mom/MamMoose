@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, ExternalLink, Check, Search, Map as MapIcon, X, Utensils } from 'lucide-react';
+import { Plus, ExternalLink, Check, Search, Map as MapIcon, X, Utensils, Navigation } from 'lucide-react';
 import type { EntryComment, TripDoc } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
@@ -7,6 +7,7 @@ import { useMyName } from '../lib/members';
 import { usePlaces, splitAreas, KIND_LABEL, type Place, type PlaceKind } from '../lib/places';
 import { coordsForArea } from '../lib/areaCoords';
 import { geocode } from '../lib/geocode';
+import { directionsUrl } from '../lib/maps';
 import {
   PlaceFilterControls, applyPlaceFilter, filterSummary, emptyFilterState, type PlaceFilterState,
 } from '../components/PlaceFilter';
@@ -247,6 +248,10 @@ export default function PlacesView() {
           }
           footer={
             <div className="flex gap-2">
+              <a href={directionsUrl(detail.origName || detail.name)} target="_blank" rel="noreferrer"
+                className="flex items-center justify-center rounded-xl border border-white/10 px-3 text-slate-300" title="길찾기">
+                <Navigation size={15} />
+              </a>
               {detail.mapUrl && (
                 <a href={detail.mapUrl} target="_blank" rel="noreferrer"
                   className="flex items-center justify-center rounded-xl border border-white/10 px-3 text-slate-300">

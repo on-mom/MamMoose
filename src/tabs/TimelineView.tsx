@@ -8,12 +8,14 @@ import {
   SortableContext, useSortable, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Plus, Trash2, Clock, MapPin, Sparkles, Heart, MessageCircle, Lock, Pencil } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Clock, MapPin, Sparkles, Heart, MessageCircle, Lock, Pencil, Navigation } from 'lucide-react';
 import type { TimelineItem } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { computeFocus } from '../lib/timezone';
 import { coordsForArea } from '../lib/areaCoords';
+import { directionsUrl } from '../lib/maps';
+import { useWeather, wxIcon } from '../lib/weather';
 import { useMemberNames, useMyName } from '../lib/members';
 import { usePlaces } from '../lib/places';
 import Modal from '../components/Modal';
@@ -29,6 +31,11 @@ const dateOfDay = (start: string, day: number) => {
   const d = new Date(start + 'T00:00:00');
   d.setDate(d.getDate() + day - 1);
   return `${d.getMonth() + 1}/${d.getDate()} (${'일월화수목금토'[d.getDay()]})`;
+};
+const isoOfDay = (start: string, day: number) => {
+  const d = new Date(start + 'T00:00:00');
+  d.setDate(d.getDate() + day - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 type Board = Record<string, string[]>;
@@ -148,6 +155,17 @@ export default function TimelineView() {
       navigator.vibrate?.(10);
     });
 
+  const wx = useWeather();
+  const dayWeather = (k: string) => {
+    const w = wx[isoOfDay(project.startDate, Number(k))];
+    if (!w) return null;
+    return (
+      <span className="ml-1.5 text-[11px] font-normal text-slate-400">
+        {wxIcon(w.code)} {w.tmax}°/{w.tmin}°{w.pop >= 30 ? ` · ☔${w.pop}%` : ''}
+      </span>
+    );
+  };
+
   const focus = useMemo(() => computeFocus(project, items), [project, items]);
   const focusRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -233,7 +251,7 @@ export default function TimelineView() {
           {dayKeys(days).map((k) => (
             <section key={k} className="space-y-2">
               <h3 className="font-title text-base font-bold text-white">
-                {k}일차 <span className="text-xs font-normal text-slate-500">{dateOfDay(project.startDate, Number(k))}</span>
+                {k}일차 <span className="text-xs font-normal text-slate-500">{dateOfDay(project.startDate, Number(k))}</span>{dayWeather(k)}
               </h3>
               {(board[k] ?? []).length === 0 && (
                 <p className="rounded-lg border border-dashed border-moose-edge py-3 text-center text-[11px] text-slate-600">
@@ -266,7 +284,7 @@ export default function TimelineView() {
             <section key={k} className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="font-title text-base font-bold text-white">
-                  {k}일차 <span className="text-xs font-normal text-slate-500">{dateOfDay(project.startDate, Number(k))}</span>
+                  {k}일차 <span className="text-xs font-normal text-slate-500">{dateOfDay(project.startDate, Number(k))}</span>{dayWeather(k)}
                 </h3>
                 <button onClick={() => addItem(Number(k))} className="flex items-center gap-1 text-xs text-moose-heart">
                   <Plus size={14} /> 추가
@@ -415,6 +433,16 @@ function ItemDetailModal({ item, onClose }: { item: TimelineItem; onClose: () =>
           >
             <Heart size={14} fill={iLike ? 'currentColor' : 'none'} /> 좋아요
           </button>
+          {item.place && item.place !== '새 일정' && (
+            <a
+              href={directionsUrl(item.place, item.lat, item.lng)}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-sm font-semibold text-slate-300"
+            >
+              <Navigation size={14} /> 길찾기
+            </a>
+          )}
           {likes.length > 0 && <span className="text-[11px] text-slate-400">{likes.join(' · ')}</span>}
         </div>
 

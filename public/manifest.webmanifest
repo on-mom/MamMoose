@@ -1,0 +1,16 @@
+{
+  "name": "맘무스 · 커플 여행 플래너",
+  "short_name": "맘무스",
+  "description": "큰맘 먹고 떠나는 커플 여행 플래너",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#131019",
+  "theme_color": "#131019",
+  "lang": "ko",
+  "icons": [
+    { "src": "/moose-face.png", "sizes": "360x360", "type": "image/png", "purpose": "any" },
+    { "src": "/moose-face.png", "sizes": "360x360", "type": "image/png", "purpose": "maskable" }
+  ]
+}

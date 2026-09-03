@@ -13,10 +13,11 @@ import Modal from '../components/Modal';
 import { outboundText, inboundText, carrierOf } from '../lib/flight';
 import { CITY_TZ } from '../lib/cities';
 import DiaryView from './DiaryView';
+import ToolsView from './ToolsView';
 import MemoriesView, { useMemoryPicks, tripEnded } from './MemoriesView';
 import { ensureNotifyPermission, fireLocalNotification, alreadyNotified, markNotified, canNotify } from '../lib/notify';
 
-type Sub = 'chat' | 'diary' | 'memories' | 'trips' | 'settings';
+type Sub = 'chat' | 'diary' | 'memories' | 'tools' | 'trips' | 'settings';
 const hhmm = (ts: number) =>
   new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
@@ -47,17 +48,17 @@ export default function MyTab() {
   const tabs: [Sub, string][] = [
     ['chat', '채팅'], ['diary', '일기'],
     ...(showMemories ? [['memories', '추억함'] as [Sub, string]] : []),
-    ['trips', '여행'], ['settings', '설정'],
+    ['tools', '도구'], ['trips', '여행'], ['settings', '설정'],
   ];
 
   return (
     <div className="edge flex h-full flex-col py-3">
-      <div className="mb-3 flex gap-1 rounded-lg bg-moose-dusk p-1 text-[11px]">
+      <div className="no-scrollbar mb-3 flex gap-1 overflow-x-auto rounded-lg bg-moose-dusk p-1 text-[11px]">
         {tabs.map(([k, l]) => (
           <button
             key={k}
             onClick={() => setSub(k)}
-            className={`flex-1 rounded-md py-1.5 ${sub === k ? 'bg-moose-heart text-white' : 'text-slate-400'}`}
+            className={`shrink-0 flex-1 rounded-md px-3 py-1.5 ${sub === k ? 'bg-moose-heart text-white' : 'text-slate-400'}`}
           >
             {l}
           </button>
@@ -81,6 +82,7 @@ export default function MyTab() {
       {sub === 'chat' && <Chat />}
       {sub === 'diary' && <DiaryView />}
       {sub === 'memories' && <MemoriesView />}
+      {sub === 'tools' && <ToolsView />}
       {sub === 'trips' && <Trips />}
       {sub === 'settings' && <Settings />}
     </div>

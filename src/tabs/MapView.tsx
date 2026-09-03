@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
-import { Crosshair, X, LocateFixed, Loader2 } from 'lucide-react';
+import { Crosshair, X, LocateFixed, Loader2, Navigation } from 'lucide-react';
 import type { TimelineItem } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { geocode } from '../lib/geocode';
+import { directionsUrl } from '../lib/maps';
 import PlaceMap, { type MapPoint } from '../components/PlaceMap';
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
@@ -121,6 +122,17 @@ export default function MapView() {
               {idx + 1}
             </span>
             <span className="min-w-0 flex-1 truncate text-slate-200">{it.place}</span>
+            {it.place && it.place !== '새 일정' && (
+              <a
+                href={directionsUrl(it.place, it.lat, it.lng)}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-0.5 text-moose-heart"
+              >
+                <Navigation size={11} /> 길찾기
+              </a>
+            )}
             {it.lat != null ? (
               <button
                 onClick={(e) => { e.stopPropagation(); setCoords(it.id, null, null); }}
