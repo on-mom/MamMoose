@@ -28,13 +28,20 @@ export default function ZoneGuideView() {
             <div key={g.id} className="overflow-hidden rounded-xl border border-white/5 bg-moose-dusk/70">
               <button
                 onClick={() => setOpen(isOpen ? '' : g.id)}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
+                className="block w-full text-left"
               >
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-white">{g.name} <span className="text-[10px] font-normal text-slate-500">{g.en}</span></div>
-                  <div className="truncate text-[11px] text-slate-400">{g.intro}</div>
+                <div className="relative h-28 w-full">
+                  <img src={g.photo} alt={g.name} loading="lazy" className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+                  <span className="absolute right-1.5 top-1.5 rounded bg-black/45 px-1 py-0.5 text-[8px] text-white/70">{g.credit}</span>
+                  <div className="absolute inset-x-3 bottom-1.5 flex items-end justify-between gap-2">
+                    <div className="text-sm font-bold text-white drop-shadow">
+                      {g.name} <span className="text-[10px] font-normal text-white/60">{g.en}</span>
+                    </div>
+                    <ChevronDown size={16} className={`mb-0.5 shrink-0 text-white/80 transition ${isOpen ? 'rotate-180' : ''}`} />
+                  </div>
                 </div>
-                <ChevronDown size={15} className={`shrink-0 text-slate-500 transition ${isOpen ? 'rotate-180' : ''}`} />
+                <div className="px-3 py-2 text-[11px] text-slate-400">{g.intro}</div>
               </button>
               {isOpen && (
                 <div className="space-y-2.5 border-t border-white/5 px-3 py-3">

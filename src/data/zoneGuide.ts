@@ -8,6 +8,8 @@ export interface AreaGuide {
   name: string;
   en: string;
   intro: string;
+  photo: string;   // 대표 랜드마크 사진 (public/zones)
+  credit: string;  // 사진 출처
   mustSee: GuideItem[];
   food: GuideItem[];
   cafe: GuideItem;
@@ -20,6 +22,8 @@ export const AREA_GUIDES: AreaGuide[] = [
   {
     id: 'oldq', name: '올드쿼터', en: 'Old Quarter',
     intro: '구시가지 — 역사와 전통이 숨 쉬는 관광 중심지',
+    photo: '/zones/oldq.jpg',
+    credit: '응옥선 사당 · © Richard Mortel (CC BY 2.0)',
     mustSee: [
       { place: '호안끼엠 호수 주말 차 없는 거리', desc: '현지인 나들이·데이트 명소' },
       { place: '성요셉 성당 & 응옥썬 사당', desc: '외국인 필수 코스 (호안끼엠 호수)' },
@@ -36,6 +40,8 @@ export const AREA_GUIDES: AreaGuide[] = [
   {
     id: 'badinh', name: '바딘', en: 'Ba Dinh',
     intro: '정치·문화의 중심이자 청린 지대의 고급 주거 구역',
+    photo: '/zones/badinh.jpg',
+    credit: '호치민 묘소 · © NKSTTSSHNVN (CC BY-SA 4.0)',
     mustSee: [
       { place: '바딘 광장 주변 산책로 · 쭉박(Trúc Bạch) 호수 산책길', desc: '현지인 나들이·데이트 명소' },
       { place: '바딘 광장(호치민 생가/묘소) · 바딘 문묘(하노이 국립대학)', desc: '외국인 필수 코스' },
@@ -52,6 +58,8 @@ export const AREA_GUIDES: AreaGuide[] = [
   {
     id: 'taiho', name: '서호', en: 'Tay Ho',
     intro: '트렌디한 외국인 주재원 및 고급 부촌 구역',
+    photo: '/zones/taiho.jpg',
+    credit: '진국사(쩐꾸옥 사원) · © RB Photo (CC BY 4.0)',
     mustSee: [
       { place: '서호 자전거 도로 & 수련 꽃밭 / 노을 스팟 (Hồ Tây)', desc: '현지인 나들이·데이트 명소' },
       { place: '진국사 (Chùa Trấn Quốc)', desc: '하노이에서 가장 오래된 사찰' },
@@ -68,6 +76,8 @@ export const AREA_GUIDES: AreaGuide[] = [
   {
     id: 'caugiay', name: '꺼우저이', en: 'Cau Giay',
     intro: '신도시 및 현지 부촌 생활권',
+    photo: '/zones/caugiay.jpg',
+    credit: 'Keangnam 랜드마크 72 · © Soyoungah (CC BY-SA 3.0)',
     mustSee: [
       { place: '꺼우저이 공원 (Công viên Cầu Giấy)', desc: '현지 가족/커플들의 힐링 스팟' },
       { place: '베트남 민족학 박물관 (Museum of Ethnology)', desc: '베트남 54개 민족 문화 체험' },
