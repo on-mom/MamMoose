@@ -3,7 +3,8 @@ import { Plus, Trash2, RefreshCw } from 'lucide-react';
 import type { Expense, ExpenseCategory } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
-import { toKrw, commas, cachedRate, fetchVndKrwRate, FALLBACK_VND_KRW } from '../lib/currency';
+import { toKrw, commas, cachedRate, fetchRate, fallbackRate } from '../lib/currency';
+import { currencyOf, currencyMeta } from '../lib/cities';
 import { useDebounced } from '../lib/useDebounced';
 import { MooseEmpty, Moose } from '../components/Moose';
 import { BottomSheet } from '../components/Modal';
@@ -18,15 +19,21 @@ export default function BudgetTab() {
   const mutate = useAppStore((s) => s.mutate);
   const patchProject = useAppStore((s) => s.patchProject);
 
-  const [live, setLive] = useState<number>(cachedRate());
+  // 현지 통화는 여행지(시간대·목적지)에서 자동 판별
+  const local = currencyOf(project.timezone, project.destination);
+  const m = currencyMeta(local);
+
+  const [live, setLive] = useState<number>(cachedRate(local));
   const [syncing, setSyncing] = useState(false);
   const refreshRate = () => {
     setSyncing(true);
-    fetchVndKrwRate().then((r) => { setLive(r); setSyncing(false); });
+    fetchRate(local).then((r) => { setLive(r); setSyncing(false); });
   };
-  useEffect(() => { if (settings.rateMode === 'live') refreshRate(); }, []); // eslint-disable-line
+  useEffect(() => { setLive(cachedRate(local)); if (settings.rateMode === 'live') refreshRate(); }, [local]); // eslint-disable-line
 
-  const rate = settings.rateMode === 'live' ? live : Number(settings.fixedVndToKrw) || FALLBACK_VND_KRW;
+  const rate = local === 'KRW' ? 1
+    : settings.rateMode === 'live' ? live
+    : Number(settings.fixedVndToKrw) || fallbackRate(local);
 
   const [fCat, setFCat] = useState<string>('전체');
   const [fDate, setFDate] = useState('');
@@ -63,9 +70,10 @@ export default function BudgetTab() {
       <h2 className="font-title text-xl font-bold text-white">가계부</h2>
 
       {/* 환율 */}
+      {local !== 'KRW' && (
       <div className="mt-2 flex items-center justify-between rounded-lg bg-moose-dusk/70 px-3 py-2 text-[11px]">
         <div className="flex items-center gap-2 text-slate-400">
-          <span>1 VND =</span>
+          <span>1 {local} =</span>
           {settings.rateMode === 'fixed' ? (
             <input
               value={settings.fixedVndToKrw}
@@ -73,7 +81,7 @@ export default function BudgetTab() {
               className="w-16 rounded bg-moose-edge px-1.5 py-0.5 text-right text-slate-200 outline-none"
             />
           ) : (
-            <span className="text-slate-200">{rate.toFixed(5)}</span>
+            <span className="text-slate-200">{rate < 1 ? rate.toFixed(5) : rate.toFixed(2)}</span>
           )}
           <span>KRW</span>
         </div>
@@ -91,6 +99,7 @@ export default function BudgetTab() {
           )}
         </div>
       </div>
+      )}
 
       {/* 예산 */}
       <div className="mt-2 flex items-center justify-between rounded-lg bg-moose-dusk/70 px-3 py-2 text-[11px]">
@@ -141,13 +150,15 @@ export default function BudgetTab() {
                 onChange={(ev) => commitEdit(e.id, { amountVnd: ev.target.value, amountKrw: toKrw(ev.target.value, rate) })}
                 className="w-24 bg-transparent text-right text-slate-100 outline-none"
               />
-              <span className="text-slate-500">₫</span>
+              <span className="text-slate-500">{m.symbol}</span>
               <button onClick={() => remove(e.id)} className="text-slate-700 hover:text-rose-400"><Trash2 size={12} /></button>
             </div>
-            <div className="text-right text-[11px] text-emerald-400">≈ {commas(toKrw(e.amountVnd || '0', rate))} 원</div>
+            {local !== 'KRW' && (
+              <div className="text-right text-[11px] text-emerald-400">≈ {commas(toKrw(e.amountVnd || '0', rate))} 원</div>
+            )}
           </li>
         ))}
-        {rows.length === 0 && <li><MooseEmpty line="아직 지출 내역이 없어요" sub="VND로 입력하면 원화로 바로 환산돼요" /></li>}
+        {rows.length === 0 && <li><MooseEmpty line="아직 지출 내역이 없어요" sub={local === 'KRW' ? '지출을 기록해 보세요' : `${m.name}(으)로 입력하면 원화로 바로 환산돼요`} /></li>}
       </ul>
 
       {/* 하단 고정 합계 */}
@@ -194,31 +205,33 @@ export default function BudgetTab() {
         <div className="flex items-center justify-between text-sm">
           <span className="text-slate-400">합계 ({rows.length}건)</span>
           <div className="text-right">
-            <div className="font-bold text-white">{commas(totalVnd)} ₫</div>
-            <div className="text-xs text-emerald-400">≈ {commas(totalKrw)} 원</div>
+            <div className="font-bold text-white">{commas(totalVnd)} {m.symbol}</div>
+            {local !== 'KRW' && <div className="text-xs text-emerald-400">≈ {commas(totalKrw)} 원</div>}
           </div>
         </div>
       </div>
 
       {addOpen && (
         <BottomSheet title="지출 추가" onClose={() => setAddOpen(false)}>
-          <AddForm projectId={project.id} rate={rate} onDone={() => setAddOpen(false)} />
+          <AddForm projectId={project.id} rate={rate} local={local} onDone={() => setAddOpen(false)} />
         </BottomSheet>
       )}
     </div>
   );
 }
 
-function AddForm({ projectId, rate, onDone }: { projectId: string; rate: number; onDone: () => void }) {
+function AddForm({ projectId, rate, local, onDone }: { projectId: string; rate: number; local: string; onDone: () => void }) {
   const mutate = useAppStore((s) => s.mutate);
+  const lm = currencyMeta(local);
   const today = new Date().toISOString().slice(0, 10);
   const [f, setF] = useState({ date: today, category: '식사' as ExpenseCategory, categoryEtc: '', vendor: '', amount: '' });
-  const [cur, setCur] = useState<'VND' | 'KRW'>('VND');
+  const [cur, setCur] = useState<'local' | 'KRW'>(local === 'KRW' ? 'KRW' : 'local');
 
-  // 입력 통화와 무관하게 저장은 VND 원금 + KRW 환산 둘 다
+  // 입력 통화와 무관하게 저장은 현지통화 원금 + KRW 환산 둘 다
   const n = Number(f.amount) || 0;
-  const vnd = cur === 'VND' ? n : Math.round(n / rate);
-  const krw = cur === 'VND' ? Number(toKrw(String(n), rate)) : n;
+  const localAmt = cur === 'local' ? n : Math.round(n / rate);
+  const krw = cur === 'local' ? Number(toKrw(String(n), rate)) : n;
+  const vnd = localAmt; // 필드명 하위호환 (실제로는 현지통화 금액)
 
   const submit = () => {
     if (!f.amount || !f.vendor.trim()) return;
@@ -255,19 +268,20 @@ function AddForm({ projectId, rate, onDone }: { projectId: string; rate: number;
       <div className="flex items-center gap-2">
         <select
           value={cur}
-          onChange={(e) => setCur(e.target.value as 'VND' | 'KRW')}
-          className="shrink-0 rounded bg-moose-edge px-2 py-1.5 font-semibold text-slate-100 outline-none"
+          onChange={(e) => setCur(e.target.value as 'local' | 'KRW')}
+          disabled={local === 'KRW'}
+          className="shrink-0 rounded bg-moose-edge px-2 py-1.5 font-semibold text-slate-100 outline-none disabled:opacity-60"
         >
-          <option value="VND">₫ 동</option>
+          <option value="local">{lm.symbol} {lm.name}</option>
           <option value="KRW">₩ 원</option>
         </select>
         <input type="number" inputMode="numeric" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })}
-          placeholder={cur === 'VND' ? '금액 (VND)' : '금액 (원)'} className="flex-1 rounded bg-moose-edge px-2 py-1.5 text-right text-slate-100 outline-none" />
+          placeholder={`금액 (${cur === 'local' ? lm.name : '원'})`} className="flex-1 rounded bg-moose-edge px-2 py-1.5 text-right text-slate-100 outline-none" />
         <button onClick={submit} className="rounded btn-heart rounded-xl px-3 py-1.5 font-semibold"><Plus size={14} /></button>
       </div>
-      {f.amount && (
+      {f.amount && local !== 'KRW' && (
         <div className="text-right text-[11px] text-emerald-400">
-          {cur === 'VND' ? `≈ ${commas(krw)} 원` : `≈ ${commas(vnd)} ₫`}
+          {cur === 'local' ? `≈ ${commas(krw)} 원` : `≈ ${commas(localAmt)} ${lm.symbol}`}
         </div>
       )}
     </div>

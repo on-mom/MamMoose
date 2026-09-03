@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
-import { toKrw, commas, cachedRate, FALLBACK_VND_KRW } from '../lib/currency';
+import { toKrw, commas, cachedRate, fallbackRate } from '../lib/currency';
+import { currencyOf } from '../lib/cities';
 import { useMemoryPicks } from '../lib/memories';
 import CoupleMoose from '../components/CoupleMoose';
 
@@ -17,7 +18,10 @@ export default function TripSummary() {
   const cardRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
 
-  const rate = settings.rateMode === 'live' ? cachedRate() : Number(settings.fixedVndToKrw) || FALLBACK_VND_KRW;
+  const local = currencyOf(project.timezone, project.destination);
+  const rate = local === 'KRW' ? 1
+    : settings.rateMode === 'live' ? cachedRate(local)
+    : Number(settings.fixedVndToKrw) || fallbackRate(local);
 
   const stats = useMemo(() => {
     const t = doc?.timeline ?? [];
