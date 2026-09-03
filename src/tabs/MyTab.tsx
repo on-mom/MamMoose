@@ -3,7 +3,7 @@ import {
   Check, LogOut, Plus, Send, Camera, Image as ImageIcon, UserPlus, Copy, AlertTriangle,
   MoreVertical, Pencil, Trash2,
 } from 'lucide-react';
-import type { Project } from '../types';
+import type { Project, Person } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { cloudEnabled, signOut } from '../lib/supabase';
@@ -60,54 +60,103 @@ function Chat() {
   const profile = useAppStore((s) => s.profile);
   const setProfile = useAppStore((s) => s.setProfile);
   const messages = useAppStore((s) => s.present[s.activeProjectId]?.messages ?? []);
+  const people = useAppStore((s) => s.present[s.activeProjectId]?.people ?? {});
   const mutate = useAppStore((s) => s.mutate);
+  const cloudUser = useAppStore((s) => s.cloudUser);
   const [text, setText] = useState('');
   const [err, setErr] = useState('');
+  const [viewPerson, setViewPerson] = useState<Person | null>(null);
   const avatarInput = useRef<HTMLInputElement>(null);
   const bgInput = useRef<HTMLInputElement>(null);
+
+  const myName = cloudUser?.name || profile.displayName || '나';
+  const myAvatar = cloudUser?.avatar || profile.avatarDataUrl;
+
+  /** 내 프로필 스냅샷을 채팅방(TripDoc)에 반영 — 동행자에게도 동기화됨 */
+  const syncMe = (over: Partial<Person> = {}) =>
+    mutate((doc) => {
+      doc.people = doc.people ?? {};
+      doc.people[myName] = {
+        name: myName,
+        avatar: myAvatar ?? null,
+        bg: profile.chatBgDataUrl ?? null,
+        statusMessage: profile.statusMessage ?? '',
+        ...over,
+      };
+    });
 
   const pickImage = (which: 'avatarDataUrl' | 'chatBgDataUrl') => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    try { setProfile({ [which]: await readImage(file) }); setErr(''); }
-    catch (x) { setErr((x as Error).message); }
+    try {
+      const url = await readImage(file);
+      setProfile({ [which]: url });
+      setErr('');
+      syncMe(which === 'avatarDataUrl' ? { avatar: url } : { bg: url });
+    } catch (x) { setErr((x as Error).message); }
   };
 
-  const cloudUser = useAppStore((s) => s.cloudUser);
   const send = () => {
     if (!text.trim()) return;
     mutate((doc) => {
       doc.messages.push({
         id: uid(), projectId: project.id,
-        author: cloudUser?.name || profile.displayName || '나', text: text.trim(), sentAt: Date.now(),
+        author: myName, text: text.trim(), sentAt: Date.now(),
       });
+      doc.people = doc.people ?? {};
+      doc.people[myName] = {
+        name: myName, avatar: myAvatar ?? null,
+        bg: profile.chatBgDataUrl ?? null, statusMessage: profile.statusMessage ?? '',
+      };
     });
     setText('');
   };
 
+  const personOf = (name: string): Person =>
+    name === myName
+      ? { name: myName, avatar: myAvatar ?? null, bg: profile.chatBgDataUrl ?? null, statusMessage: profile.statusMessage }
+      : people[name] ?? { name };
+
+  const Avatar = ({ p, onClick }: { p: Person; onClick?: () => void }) => (
+    <button onClick={onClick} disabled={!onClick} className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-moose-edge">
+      {p.avatar ? <img src={p.avatar} alt="" className="h-full w-full object-cover" />
+        : <Moose variant="face" className="h-full w-full object-cover" alt="" />}
+    </button>
+  );
+
   return (
     <div className="flex h-full flex-col">
-      {/* 프로필 */}
-      <div className="flex items-center gap-3 card p-3">
-        <button onClick={() => avatarInput.current?.click()} className="relative">
-          {profile.avatarDataUrl ? (
-            <img src={profile.avatarDataUrl} alt="" className="h-12 w-12 rounded-full object-cover" />
-          ) : (
-            <div className="h-12 w-12 overflow-hidden rounded-full bg-moose-edge">
-              <Moose variant="face" className="h-full w-full object-cover" alt="" />
-            </div>
-          )}
-          <Camera size={12} className="absolute -bottom-0.5 -right-0.5 rounded-full bg-moose-night p-[1px] text-slate-300" />
-        </button>
+      {/* 내 프로필 */}
+      <div className="card space-y-2 p-3">
+        <div className="flex items-center gap-3">
+          <button onClick={() => avatarInput.current?.click()} className="relative">
+            {myAvatar ? (
+              <img src={myAvatar} alt="" className="h-12 w-12 rounded-full object-cover" />
+            ) : (
+              <div className="h-12 w-12 overflow-hidden rounded-full bg-moose-edge">
+                <Moose variant="face" className="h-full w-full object-cover" alt="" />
+              </div>
+            )}
+            <Camera size={12} className="absolute -bottom-0.5 -right-0.5 rounded-full bg-moose-night p-[1px] text-slate-300" />
+          </button>
+          <input
+            value={profile.displayName}
+            onChange={(e) => setProfile({ displayName: e.target.value })}
+            onBlur={() => syncMe()}
+            placeholder="프로필명"
+            className="flex-1 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-600"
+          />
+          <button onClick={() => bgInput.current?.click()} className="flex items-center gap-1 text-[11px] text-slate-400">
+            <ImageIcon size={13} /> 배경
+          </button>
+        </div>
         <input
-          value={profile.displayName}
-          onChange={(e) => setProfile({ displayName: e.target.value })}
-          placeholder="프로필명"
-          className="flex-1 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-600"
+          value={profile.statusMessage ?? ''}
+          onChange={(e) => setProfile({ statusMessage: e.target.value })}
+          onBlur={() => syncMe()}
+          placeholder="상태 메시지"
+          className="w-full bg-transparent text-[12px] text-slate-300 outline-none placeholder:text-slate-600"
         />
-        <button onClick={() => bgInput.current?.click()} className="flex items-center gap-1 text-[11px] text-slate-400">
-          <ImageIcon size={13} /> 배경
-        </button>
         <input ref={avatarInput} type="file" accept="image/*" hidden onChange={pickImage('avatarDataUrl')} />
         <input ref={bgInput} type="file" accept="image/*" hidden onChange={pickImage('chatBgDataUrl')} />
       </div>
@@ -115,7 +164,7 @@ function Chat() {
 
       {/* 메시지 */}
       <div
-        className="my-2 flex-1 space-y-2 overflow-y-auto rounded-xl bg-moose-dusk/40 bg-cover bg-center p-3"
+        className="my-2 flex-1 space-y-2.5 overflow-y-auto rounded-xl bg-moose-dusk/40 bg-cover bg-center p-3"
         style={profile.chatBgDataUrl ? { backgroundImage: `url(${profile.chatBgDataUrl})` } : undefined}
       >
         {messages.length === 0 && (
@@ -124,13 +173,27 @@ function Chat() {
             <p className="text-xs text-slate-400">동행자와 나눌 이야기를 남겨보세요</p>
           </div>
         )}
-        {messages.map((m) => (
-          <div key={m.id} className="max-w-[80%] rounded-2xl rounded-tl-sm bg-moose-edge/95 px-3 py-1.5">
-            <div className="text-[10px] text-slate-400">{m.author}</div>
-            <div className="text-sm text-slate-100">{m.text}</div>
-            <div className="text-right text-[10px] text-slate-500">{hhmm(m.sentAt)}</div>
-          </div>
-        ))}
+        {messages.map((m) => {
+          const mine = m.author === myName;
+          const p = personOf(m.author);
+          return (
+            <div key={m.id} className={`flex items-end gap-1.5 ${mine ? 'flex-row-reverse' : ''}`}>
+              {!mine && <Avatar p={p} onClick={() => setViewPerson(p)} />}
+              <div className={`max-w-[76%] ${mine ? 'items-end' : ''}`}>
+                {!mine && <div className="mb-0.5 text-[10px] text-slate-400">{m.author}</div>}
+                <div className="flex items-end gap-1">
+                  {mine && <span className="text-[9px] text-slate-500">{hhmm(m.sentAt)}</span>}
+                  <div className={`rounded-2xl px-3 py-1.5 text-sm ${
+                    mine ? 'rounded-br-sm bg-moose-heart text-white' : 'rounded-tl-sm bg-moose-edge/95 text-slate-100'
+                  }`}>
+                    {m.text}
+                  </div>
+                  {!mine && <span className="text-[9px] text-slate-500">{hhmm(m.sentAt)}</span>}
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="flex gap-2">
@@ -143,6 +206,28 @@ function Chat() {
         />
         <button onClick={send} className="rounded-full bg-moose-heart px-3 text-white"><Send size={16} /></button>
       </div>
+
+      {viewPerson && (
+        <Modal onClose={() => setViewPerson(null)} title={<span className="text-xs font-semibold text-slate-400">프로필</span>}>
+          <div className="-mx-5 -my-4">
+            <div
+              className="h-28 bg-moose-edge bg-cover bg-center"
+              style={viewPerson.bg ? { backgroundImage: `url(${viewPerson.bg})` } : undefined}
+            />
+            <div className="flex flex-col items-center px-4 pb-1">
+              <div className="-mt-9 h-16 w-16 overflow-hidden rounded-full border-2 border-moose-night bg-moose-edge">
+                {viewPerson.avatar
+                  ? <img src={viewPerson.avatar} alt="" className="h-full w-full object-cover" />
+                  : <Moose variant="face" className="h-full w-full object-cover" alt="" />}
+              </div>
+              <div className="mt-2 text-base font-bold text-white">{viewPerson.name}</div>
+              {viewPerson.statusMessage
+                ? <div className="mt-0.5 text-center text-[13px] text-slate-400">{viewPerson.statusMessage}</div>
+                : <div className="mt-0.5 text-[12px] text-slate-600">상태 메시지 없음</div>}
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -18,8 +18,8 @@ export interface Column<T> {
   /** 커스텀 셀 렌더 (없으면 get 값) */
   render?: (row: T) => ReactNode;
   sortable?: boolean;
-  /** 'text' 입력 검색 · 'multi' 값 다중선택 칩 · 'none' */
-  filter?: 'text' | 'multi' | 'none';
+  /** 'text' 입력 검색 · 'multi' 값 다중선택 칩 · 'range' 숫자 min~max · 'none' */
+  filter?: 'text' | 'multi' | 'range' | 'none';
 }
 
 /**
@@ -39,6 +39,7 @@ export default function DataTable<T>({
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [text, setText] = useState<Record<string, string>>({});
   const [multi, setMulti] = useState<Record<string, Set<string>>>({});
+  const [range, setRange] = useState<Record<string, { min?: string; max?: string }>>({});
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
   const [colsOpen, setColsOpen] = useState(false);
   const [multiOpen, setMultiOpen] = useState<string | null>(null);
@@ -56,6 +57,12 @@ export default function DataTable<T>({
       if (q) r = r.filter((row) => String(c.get(row)).toLowerCase().includes(q));
       const sel = multi[c.key];
       if (sel && sel.size) r = r.filter((row) => sel.has(String(c.get(row))));
+      const rg = range[c.key];
+      if (rg && (rg.min || rg.max)) {
+        const lo = rg.min ? Number(rg.min) : -Infinity;
+        const hi = rg.max ? Number(rg.max) : Infinity;
+        r = r.filter((row) => { const v = Number(c.get(row)); return v >= lo && v <= hi; });
+      }
     }
     if (sort) {
       const c = colMap[sort.key];
@@ -67,7 +74,7 @@ export default function DataTable<T>({
       });
     }
     return r;
-  }, [rows, columns, text, multi, sort, colMap]);
+  }, [rows, columns, text, multi, range, sort, colMap]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -83,9 +90,11 @@ export default function DataTable<T>({
     if (!colMap[k].sortable) return;
     setSort((s) => (s?.key === k ? (s.dir === 1 ? { key: k, dir: -1 } : null) : { key: k, dir: 1 }));
   };
-  const anyTextFilter = columns.some((c) => c.filter === 'text');
+  const anyRowFilter = columns.some((c) => c.filter === 'text' || c.filter === 'range');
   const activeFilters =
-    Object.values(text).filter(Boolean).length + Object.values(multi).filter((s) => s?.size).length;
+    Object.values(text).filter(Boolean).length
+    + Object.values(multi).filter((s) => s?.size).length
+    + Object.values(range).filter((r) => r?.min || r?.max).length;
 
   return (
     <div onClick={() => { setColsOpen(false); setMultiOpen(null); }}>
@@ -136,7 +145,7 @@ export default function DataTable<T>({
                   ))}
                 </SortableContext>
               </tr>
-              {anyTextFilter && (
+              {anyRowFilter && (
                 <tr>
                   {visible.map((c) => (
                     <th key={c.key} className="px-1.5 pb-1.5">
@@ -147,6 +156,25 @@ export default function DataTable<T>({
                           placeholder="검색"
                           className="w-full rounded-lg bg-white/5 px-2 py-1 text-[11px] font-normal text-slate-200 outline-none ring-1 ring-white/5 placeholder:text-slate-600"
                         />
+                      )}
+                      {c.filter === 'range' && (
+                        <div className="flex items-center gap-0.5">
+                          <input
+                            inputMode="numeric"
+                            value={range[c.key]?.min ?? ''}
+                            onChange={(e) => setRange((r) => ({ ...r, [c.key]: { ...r[c.key], min: e.target.value } }))}
+                            placeholder="최소"
+                            className="w-full rounded-md bg-white/5 px-1 py-1 text-[10px] font-normal text-slate-200 outline-none ring-1 ring-white/5 placeholder:text-slate-600"
+                          />
+                          <span className="text-slate-600">~</span>
+                          <input
+                            inputMode="numeric"
+                            value={range[c.key]?.max ?? ''}
+                            onChange={(e) => setRange((r) => ({ ...r, [c.key]: { ...r[c.key], max: e.target.value } }))}
+                            placeholder="최대"
+                            className="w-full rounded-md bg-white/5 px-1 py-1 text-[10px] font-normal text-slate-200 outline-none ring-1 ring-white/5 placeholder:text-slate-600"
+                          />
+                        </div>
                       )}
                     </th>
                   ))}

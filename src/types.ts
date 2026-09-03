@@ -112,6 +112,8 @@ export interface Todo {
   done: boolean;
   priority: TodoPriority;
   order: number;
+  /** 담당자 닉네임 (여행 참여자 중 1명, 없으면 미지정) */
+  assignee?: string;
 }
 
 export type ExpenseCategory = '숙소' | '쇼핑' | '항공' | '식사' | '체험' | '기타';
@@ -132,11 +134,21 @@ export interface Expense {
   amountKrw: string;
 }
 
-/** MY 탭 > 채팅 프로필 */
+/** MY 탭 > 채팅 프로필 (내 프로필 — 로컬 보관) */
 export interface UserProfile {
   displayName: string;
   avatarDataUrl: string | null;
   chatBgDataUrl: string | null;
+  /** 상태 메시지 (카톡식) */
+  statusMessage?: string;
+}
+
+/** 채팅방 참여자 스냅샷 — TripDoc 에 담겨 동행자에게도 동기화됨 (별도 서버 테이블 없이) */
+export interface Person {
+  name: string;
+  avatar?: string | null;
+  bg?: string | null;
+  statusMessage?: string;
 }
 
 export interface ChatMessage {
@@ -167,4 +179,6 @@ export interface TripDoc {
   todos: Todo[];
   expenses: Expense[];
   messages: ChatMessage[];
+  /** 채팅 참여자 프로필 스냅샷 (name → Person). 발신·프로필수정 시 갱신 */
+  people?: Record<string, Person>;
 }

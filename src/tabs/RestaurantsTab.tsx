@@ -1,37 +1,30 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  DndContext, KeyboardSensor, PointerSensor, TouchSensor,
-  closestCenter, useSensor, useSensors, type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext, useSortable, arrayMove, horizontalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import {
-  Plus, ExternalLink, ChevronsUpDown, SlidersHorizontal, Copy, MapPin, GripVertical, Utensils, X,
+  Plus, ExternalLink, Copy, MapPin, Utensils, X,
 } from 'lucide-react';
 import type { Restaurant, Hotel } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { commas } from '../lib/currency';
 import { coordsForArea, AREA_COORDS } from '../lib/areaCoords';
+import { geocode } from '../lib/geocode';
 import Modal from '../components/Modal';
 import DataTable, { type Column } from '../components/DataTable';
+import PlaceMap, { type MapPoint } from '../components/PlaceMap';
 import { accessForArea, fmtVnd } from '../lib/hanoiAccess';
 
-type ColKey = 'nameKo' | 'area' | 'priceVndAvg' | 'link';
-const COLS: Record<ColKey, { label: string; w: number; sortable: boolean }> = {
-  nameKo: { label: '장소명', w: 148, sortable: true },
-  area: { label: '구역', w: 96, sortable: true },
-  priceVndAvg: { label: '2인 VND', w: 92, sortable: true },
-  link: { label: '바로가기', w: 62, sortable: false },
-};
-const DEFAULT_ORDER: ColKey[] = ['nameKo', 'area', 'priceVndAvg', 'link'];
-
-const BBOX = { latMax: 21.10, latMin: 20.98, lngMin: 105.74, lngMax: 105.9 };
+// 구역 토큰 분리: "바딘/올드쿼터", "바딘 · 올드쿼터", "바딘, 올드쿼터" 모두 개별 칩으로
+const splitAreas = (area: string) =>
+  area.split(/[/·,、|]|\s-\s/).map((a) => a.trim()).filter(Boolean);
 const disp = (r: Restaurant) => r.nameKo || r.name;
 const won = (t: string) => Number((t.match(/[\d,]+/)?.[0] ?? '0').replace(/,/g, '')) * (/만/.test(t) ? 10000 : 1);
 const mapQ = (name: string) => `https://maps.google.com/?q=${encodeURIComponent(name + ' Hanoi')}`;
+// id 기반 결정적 지터 — 같은 구역 핀이 완전히 겹치지 않게
+const jitter = (id: string) => {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return { dlat: ((h % 100) / 100 - 0.5) * 0.012, dlng: (((h >> 8) % 100) / 100 - 0.5) * 0.012 };
+};
 
 export default function RestaurantsTab() {
   const [view, setView] = useState<'food' | 'stay'>('food');
@@ -65,56 +58,53 @@ function FoodView() {
     () => ['전체', ...Array.from(new Set(list.map((r) => r.category)))],
     [list],
   );
-  // 복합 구역("바딘/올드쿼터")은 개별 토큰으로 분리
+  // 복합 구역("바딘/올드쿼터")은 개별 토큰으로 분리 · "전역 체인" 등은 그대로 하나의 칩
   const areas = useMemo(() => {
     const set = new Set<string>();
-    for (const r of list) r.area.split(/[/·,]/).map((a) => a.trim()).filter(Boolean).forEach((a) => set.add(a));
+    for (const r of list) splitAreas(r.area).forEach((a) => set.add(a));
     return [...set].sort((a, b) => a.localeCompare(b, 'ko'));
   }, [list]);
 
   const [cat, setCat] = useState('전체');
-  const [order, setOrder] = useState<ColKey[]>(DEFAULT_ORDER);
-  const [hidden, setHidden] = useState<Set<ColKey>>(new Set());
-  const [nameQ, setNameQ] = useState('');
   const [areaSel, setAreaSel] = useState<Set<string>>(new Set());
-  const [sort, setSort] = useState<{ key: ColKey; dir: 1 | -1 } | null>(null);
   const [adding, setAdding] = useState(false);
   const [detail, setDetail] = useState<Restaurant | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [colsOpen, setColsOpen] = useState(false);
-
+  const [geo, setGeo] = useState<Record<string, { lat: number; lng: number }>>({});
   const mapRef = useRef<HTMLDivElement | null>(null);
-  const visibleCols = order.filter((k) => !hidden.has(k));
 
   const rows = useMemo(() => {
     let r = list.filter((x) => cat === '전체' || x.category === cat);
-    if (nameQ) r = r.filter((x) => (disp(x) + x.name).toLowerCase().includes(nameQ.toLowerCase()));
-    if (areaSel.size) r = r.filter((x) => [...areaSel].some((a) => x.area.includes(a)));
-    if (sort) {
-      r = [...r].sort((a, b) => {
-        const av = sort.key === 'nameKo' ? disp(a) : (a as any)[sort.key];
-        const bv = sort.key === 'nameKo' ? disp(b) : (b as any)[sort.key];
-        return (typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv), 'ko')) * sort.dir;
-      });
-    }
+    if (areaSel.size) r = r.filter((x) => splitAreas(x.area).some((a) => areaSel.has(a)));
     return r;
-  }, [list, cat, nameQ, areaSel, sort]);
+  }, [list, cat, areaSel]);
 
-  const selectedRow = rows.find((r) => r.id === selected) ?? null;
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
-    useSensor(KeyboardSensor),
+  // 지도 핀: 기본은 구역 중심 + 지터, 선택/지오코딩된 항목은 정밀 좌표
+  const points: MapPoint[] = useMemo(
+    () => rows.slice(0, 80).map((r) => {
+      const g = geo[r.id];
+      if (g) return { id: r.id, lat: g.lat, lng: g.lng };
+      const c = coordsForArea(r.area);
+      const j = jitter(r.id);
+      return { id: r.id, lat: c.lat + j.dlat, lng: c.lng + j.dlng };
+    }),
+    [rows, geo],
   );
-  const onColDragEnd = (e: DragEndEvent) => {
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    setOrder((o) => arrayMove(o, o.indexOf(active.id as ColKey), o.indexOf(over.id as ColKey)));
-  };
-  const toggleSort = (k: ColKey) => {
-    if (!COLS[k].sortable) return;
-    setSort((s) => (s?.key === k ? (s.dir === 1 ? { key: k, dir: -1 } : null) : { key: k, dir: 1 }));
+
+  // 선택된 항목은 정밀 지오코딩 (보이는 것만, 1건씩)
+  useEffect(() => {
+    const r = rows.find((x) => x.id === selected);
+    if (!r || geo[r.id]) return;
+    let live = true;
+    geocode(r.name || disp(r)).then((res) => {
+      if (live && res) setGeo((m) => ({ ...m, [r.id]: res }));
+    });
+    return () => { live = false; };
+  }, [selected]); // eslint-disable-line
+
+  const pickRow = (r: Restaurant) => {
+    setSelected(r.id);
+    mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
   const toggleArea = (a: string) =>
     setAreaSel((s) => {
@@ -122,16 +112,48 @@ function FoodView() {
       n.has(a) ? n.delete(a) : n.add(a);
       return n;
     });
-  const pickRow = (r: Restaurant) => {
-    setSelected(r.id);
-    mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  };
   const remove = (id: string) =>
     mutate((doc) => { doc.restaurants = doc.restaurants.filter((x) => x.id !== id); });
 
+  const cols: Column<Restaurant>[] = [
+    {
+      key: 'nameKo', label: '장소명', width: 150, sortable: true, filter: 'text',
+      get: (r) => disp(r),
+      render: (r) => (
+        <button
+          onClick={(e) => { e.stopPropagation(); setDetail(r); }}
+          className="max-w-full truncate text-left font-medium text-white"
+        >
+          {disp(r)}
+          {r.custom && <span className="ml-1 text-[9px] text-moose-heart">직접</span>}
+        </button>
+      ),
+    },
+    { key: 'category', label: '분류', width: 78, sortable: true, filter: 'multi', get: (r) => r.category,
+      render: (r) => <span className="text-slate-400">{r.category}</span> },
+    { key: 'area', label: '구역', width: 92, sortable: true, filter: 'multi', get: (r) => r.area || '-',
+      render: (r) => <span className="text-slate-400">{r.area || '-'}</span> },
+    { key: 'priceVndAvg', label: '2인 VND', width: 88, sortable: true, filter: 'range', get: (r) => r.priceVndAvg,
+      render: (r) => (r.priceVndAvg ? commas(r.priceVndAvg) : '-') },
+    {
+      key: 'link', label: '바로가기', width: 62, sortable: false, filter: 'none', get: () => '',
+      render: (r) => r.mapUrl && (
+        <a
+          href={r.mapUrl}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-0.5 text-moose-heart"
+        >
+          <ExternalLink size={12} /> 지도
+        </a>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-2.5" onClick={() => setColsOpen(false)}>
-      {/* 카테고리 (단일 선택) */}
+    <div className="space-y-2.5">
+      {/* 1차: 카테고리 (단일 선택) */}
       <div className="no-scrollbar -mx-2.5 flex gap-1.5 overflow-x-auto px-2.5">
         {categories.map((c) => (
           <button
@@ -146,7 +168,7 @@ function FoodView() {
         ))}
       </div>
 
-      {/* 구역 (다중 선택 칩) */}
+      {/* 2차: 구역 (다중 선택 칩) */}
       <div className="no-scrollbar -mx-2.5 flex items-center gap-1.5 overflow-x-auto px-2.5">
         <span className="shrink-0 pr-0.5 text-[10px] font-semibold text-slate-500">구역</span>
         {areaSel.size > 0 && (
@@ -174,132 +196,39 @@ function FoodView() {
       </div>
 
       <div ref={mapRef}>
-        <MiniMap rows={rows} selected={selectedRow} onPick={pickRow} />
+        <PlaceMap
+          points={points}
+          selectedId={selected}
+          onSelect={setSelected}
+          height="160px"
+          hint="맛집 미니맵 · 행을 누르면 위치 강조 (구글맵 키 미설정)"
+        />
+        {selected && (
+          <div className="mt-1 px-0.5 text-[10px] text-slate-500">
+            📍 {(() => { const r = rows.find((x) => x.id === selected); return r ? `${disp(r)} · ${r.area}` : ''; })()}
+            {!geo[selected] && ' · 정확한 위치 찾는 중…'}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between px-0.5 text-xs text-slate-400">
         <span>{rows.length}곳{areaSel.size ? ` · ${[...areaSel].join(', ')}` : ''}</span>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <button
-              onClick={(e) => { e.stopPropagation(); setColsOpen((v) => !v); }}
-              className="flex items-center gap-1 text-slate-400"
-            >
-              <SlidersHorizontal size={13} /> 열
-            </button>
-            {colsOpen && (
-              <div
-                className="modal-surface absolute right-0 z-30 mt-1.5 w-36 space-y-0.5 rounded-xl p-2 text-xs"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="px-1 pb-1 text-[10px] text-slate-500">표시할 열</div>
-                {order.map((k) => (
-                  <label key={k} className="flex items-center gap-2 rounded-lg px-1 py-1 text-slate-200 hover:bg-white/5">
-                    <input
-                      type="checkbox"
-                      className="accent-moose-heart"
-                      checked={!hidden.has(k)}
-                      onChange={() =>
-                        setHidden((h) => {
-                          const n = new Set(h);
-                          n.has(k) ? n.delete(k) : n.add(k);
-                          return n;
-                        })
-                      }
-                    />
-                    {COLS[k].label}
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-          <button onClick={() => setAdding((v) => !v)} className="flex items-center gap-1 text-moose-heart">
-            <Plus size={14} /> 수기 등록
-          </button>
-        </div>
+        <button onClick={() => setAdding((v) => !v)} className="flex items-center gap-1 text-moose-heart">
+          <Plus size={14} /> 수기 등록
+        </button>
       </div>
 
       {adding && <AddForm projectId={project.id} onDone={() => setAdding(false)} />}
 
-      {/* 테이블 */}
-      <div className="no-scrollbar -mx-2.5 overflow-x-auto px-2.5">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onColDragEnd}>
-          <table className="border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
-            <colgroup>{visibleCols.map((k) => <col key={k} style={{ width: COLS[k].w }} />)}</colgroup>
-            <thead>
-              <tr className="text-left text-slate-400">
-                <SortableContext items={visibleCols} strategy={horizontalListSortingStrategy}>
-                  {visibleCols.map((k) => (
-                    <HeaderCell key={k} col={k} sort={sort} onSort={() => toggleSort(k)} />
-                  ))}
-                </SortableContext>
-              </tr>
-              {visibleCols.includes('nameKo') && (
-                <tr>
-                  {visibleCols.map((k) => (
-                    <th key={k} className="px-1.5 pb-1.5">
-                      {k === 'nameKo' && (
-                        <input
-                          value={nameQ}
-                          onChange={(e) => setNameQ(e.target.value)}
-                          placeholder="장소 검색"
-                          className="w-full rounded-lg bg-white/5 px-2 py-1 text-[11px] font-normal text-slate-200 outline-none ring-1 ring-white/5 placeholder:text-slate-600"
-                        />
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              )}
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr
-                  key={r.id}
-                  onClick={() => pickRow(r)}
-                  className={`cursor-pointer transition ${
-                    r.id === selected ? 'bg-moose-heart/10' : 'hover:bg-white/[0.03]'
-                  }`}
-                >
-                  {visibleCols.map((k, ci) => (
-                    <td
-                      key={k}
-                      className={`truncate border-b border-white/5 px-1.5 py-2.5 text-slate-200 ${
-                        ci === 0 ? 'rounded-l-lg' : ''
-                      } ${ci === visibleCols.length - 1 ? 'rounded-r-lg' : ''}`}
-                    >
-                      {k === 'nameKo' && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDetail(r); }}
-                          className="max-w-full truncate text-left font-medium text-white"
-                        >
-                          {disp(r)}
-                          {r.custom && <span className="ml-1 text-[9px] text-moose-heart">직접</span>}
-                        </button>
-                      )}
-                      {k === 'area' && <span className="text-slate-400">{r.area}</span>}
-                      {k === 'priceVndAvg' && (r.priceVndAvg ? commas(r.priceVndAvg) : '-')}
-                      {k === 'link' && r.mapUrl && (
-                        <a
-                          href={r.mapUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-0.5 text-moose-heart"
-                        >
-                          <ExternalLink size={12} /> 지도
-                        </a>
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </DndContext>
-        {rows.length === 0 && (
-          <p className="py-10 text-center text-xs text-slate-600">조건에 맞는 장소가 없어요</p>
-        )}
-      </div>
+      {/* 3차: 표 — 열별 검색·다중필터·정렬·열 순서변경 (구글시트식) */}
+      <DataTable
+        rows={rows}
+        columns={cols}
+        rowKey={(r) => r.id}
+        selectedKey={selected}
+        onRowClick={pickRow}
+        empty={<p className="py-10 text-center text-xs text-slate-600">조건에 맞는 장소가 없어요</p>}
+      />
 
       {/* 상세 팝업 */}
       {detail && (
@@ -372,76 +301,6 @@ function FoodView() {
           </div>
         </Modal>
       )}
-    </div>
-  );
-}
-
-/* ---------- 드래그 가능한 헤더 ---------- */
-function HeaderCell({
-  col, sort, onSort,
-}: {
-  col: ColKey;
-  sort: { key: ColKey; dir: 1 | -1 } | null;
-  onSort: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: col });
-  const c = COLS[col];
-  return (
-    <th
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
-      className="select-none whitespace-nowrap px-1.5 pb-1.5 pt-1 font-medium"
-    >
-      <div className="flex items-center gap-1">
-        <span className="cursor-grab touch-none text-slate-700 active:cursor-grabbing" {...attributes} {...listeners}>
-          <GripVertical size={11} />
-        </span>
-        <button onClick={onSort} className={`flex items-center gap-0.5 ${c.sortable ? '' : 'cursor-default'}`}>
-          {c.label}
-          {c.sortable && (
-            sort?.key === col
-              ? <span className="text-[9px] text-moose-heart">{sort.dir === 1 ? '▲' : '▼'}</span>
-              : <ChevronsUpDown size={10} className="text-slate-700" />
-          )}
-        </button>
-      </div>
-    </th>
-  );
-}
-
-/* ---------- 미니맵 ---------- */
-function MiniMap({
-  rows, selected, onPick,
-}: { rows: Restaurant[]; selected: Restaurant | null; onPick: (r: Restaurant) => void }) {
-  const toXY = (lat: number, lng: number) => ({
-    x: ((lng - BBOX.lngMin) / (BBOX.lngMax - BBOX.lngMin)) * 100,
-    y: ((BBOX.latMax - lat) / (BBOX.latMax - BBOX.latMin)) * 100,
-  });
-  const pts = rows.slice(0, 60).map((r, i) => {
-    const c = coordsForArea(r.area);
-    const j = (i % 5) * 0.004 - 0.008;
-    return { r, ...toXY(c.lat + j, c.lng + j) };
-  });
-  const sel = selected ? pts.find((p) => p.r.id === selected.id) : null;
-
-  return (
-    <div className="card relative h-32 overflow-hidden !border-white/5 bg-[radial-gradient(circle_at_50%_30%,#241d2e,#171320)]">
-      <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[length:22px_22px]" />
-      <span className="absolute left-2.5 top-2 z-10 text-[10px] text-slate-500">
-        {selected ? `📍 ${disp(selected)} · ${selected.area}` : 'Daily 동선 미니맵 · 행을 누르면 위치 표시'}
-      </span>
-      {pts.map((p) => (
-        <button
-          key={p.r.id}
-          onClick={() => onPick(p.r)}
-          style={{ left: `${p.x}%`, top: `${p.y}%` }}
-          className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-all ${
-            sel && p.r.id === sel.r.id
-              ? 'z-20 h-3 w-3 bg-moose-heart shadow-[0_0_0_5px_rgba(238,134,169,0.25)]'
-              : 'h-1.5 w-1.5 bg-slate-500/70'
-          }`}
-        />
-      ))}
     </div>
   );
 }
@@ -519,9 +378,9 @@ function StayView() {
       render: (h) => <span className="truncate font-medium text-white">{h.name}</span> },
     { key: 'grade', label: '등급', width: 58, sortable: true, filter: 'multi', get: (h) => h.grade },
     { key: 'area', label: '구역', width: 74, sortable: true, filter: 'multi', get: (h) => hotelArea(h) || '-' },
-    { key: 'rating', label: '평점', width: 52, sortable: true, filter: 'none', get: (h) => h.rating,
+    { key: 'rating', label: '평점', width: 62, sortable: true, filter: 'range', get: (h) => h.rating,
       render: (h) => <span className="text-slate-300">★ {h.rating}</span> },
-    { key: 'priceTotalText', label: '2박 총액', width: 92, sortable: true, filter: 'none', get: (h) => won(h.priceTotalText),
+    { key: 'priceTotalText', label: '2박 총액', width: 96, sortable: true, filter: 'range', get: (h) => won(h.priceTotalText),
       render: (h) => <span className="text-slate-300">{h.priceTotalText}</span> },
     { key: 'nearby', label: '인근', width: 150, sortable: false, filter: 'text', get: (h) => h.nearby,
       render: (h) => <span className="text-slate-400">{h.nearby}</span> },

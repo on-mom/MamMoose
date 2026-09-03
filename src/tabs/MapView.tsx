@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { GoogleMap, Marker, Polyline, useJsApiLoader } from '@react-google-maps/api';
-import { MapPin, Crosshair, X, LocateFixed, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useJsApiLoader } from '@react-google-maps/api';
+import { Crosshair, X, LocateFixed, Loader2 } from 'lucide-react';
 import type { TimelineItem } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { geocode } from '../lib/geocode';
+import PlaceMap, { type MapPoint } from '../components/PlaceMap';
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
-const BBOX = { latMax: 21.10, latMin: 20.98, lngMin: 105.74, lngMax: 105.90 };
 const HANOI = { lat: 21.0285, lng: 105.8542 };
 
 const tripDays = (s: string, e: string) =>
@@ -29,6 +29,7 @@ export default function MapView() {
     [items, day],
   );
   const placed = dayItems.filter((i) => i.lat != null && i.lng != null) as Placed[];
+  const points: MapPoint[] = placed.map((it, idx) => ({ id: it.id, lat: it.lat, lng: it.lng, seq: idx + 1 }));
 
   const setCoords = (id: string, lat: number | null, lng: number | null) =>
     mutate((doc) => {
@@ -92,11 +93,15 @@ export default function MapView() {
         )}
       </div>
 
-      {KEY ? (
-        <GMap items={placed} selectedId={selected} onDrag={setCoords} onSelect={setSelected} />
-      ) : (
-        <MockMap items={placed} selectedId={selected} onDrag={setCoords} onSelect={setSelected} />
-      )}
+      <PlaceMap
+        points={points}
+        selectedId={selected}
+        onSelect={setSelected}
+        onDrag={setCoords}
+        route
+        height="240px"
+        hint="Mock Map · 아래 목록에서 '지도에 배치'로 핀 추가"
+      />
 
       <ul className="space-y-1.5">
         {dayItems.length === 0 && (
@@ -146,146 +151,6 @@ export default function MapView() {
           ? '행을 누르면 지도가 그 위치로 이동 · 마커를 끌어 미세 조정하면 타임라인과 동기화'
           : '행을 누르면 핀 강조 · 마커를 끌어 위치 조정 (Google Maps 키 미설정 — Mock 지도)'}
       </p>
-    </div>
-  );
-}
-
-type DragFn = (id: string, lat: number, lng: number) => void;
-
-function GMap({
-  items, selectedId, onDrag, onSelect,
-}: { items: Placed[]; selectedId: string | null; onDrag: DragFn; onSelect: (id: string) => void }) {
-  const { isLoaded } = useJsApiLoader({ id: 'gmaps', googleMapsApiKey: KEY });
-  const mapRef = useRef<google.maps.Map | null>(null);
-
-  const fit = () => {
-    const m = mapRef.current;
-    if (!m || !items.length) return;
-    if (items.length === 1) { m.panTo(items[0]); m.setZoom(15); return; }
-    const b = new google.maps.LatLngBounds();
-    items.forEach((i) => b.extend({ lat: i.lat, lng: i.lng }));
-    m.fitBounds(b, 48);
-  };
-
-  // 선택된 항목으로 지도 이동
-  useEffect(() => {
-    const m = mapRef.current;
-    const sel = items.find((i) => i.id === selectedId);
-    if (m && sel) { m.panTo({ lat: sel.lat, lng: sel.lng }); m.setZoom(16); }
-    else if (m && !selectedId) fit();
-  }, [selectedId, items.length]); // eslint-disable-line
-
-  if (!isLoaded) return <Box>지도 불러오는 중…</Box>;
-  return (
-    <div className="overflow-hidden rounded-xl border border-white/5">
-      <GoogleMap
-        mapContainerStyle={{ width: '100%', height: '240px' }}
-        center={items[0] ?? HANOI}
-        zoom={13}
-        onLoad={(m) => { mapRef.current = m; fit(); }}
-        options={{ disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy' }}
-      >
-        {items.map((it, idx) => (
-          <Marker
-            key={it.id}
-            position={{ lat: it.lat, lng: it.lng }}
-            label={{ text: String(idx + 1), color: '#fff', fontSize: '11px', fontWeight: '700' }}
-            draggable
-            onClick={() => onSelect(it.id)}
-            onDragEnd={(e) => e.latLng && onDrag(it.id, e.latLng.lat(), e.latLng.lng())}
-            zIndex={it.id === selectedId ? 999 : idx}
-            animation={it.id === selectedId ? google.maps.Animation.BOUNCE : undefined}
-          />
-        ))}
-        {items.length > 1 && (
-          <Polyline
-            path={items.map((i) => ({ lat: i.lat, lng: i.lng }))}
-            options={{ strokeColor: '#ee86a9', strokeWeight: 3, strokeOpacity: 0.9 }}
-          />
-        )}
-      </GoogleMap>
-    </div>
-  );
-}
-
-function Box({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex h-[240px] items-center justify-center rounded-xl border border-dashed border-slate-700 bg-moose-dusk/60 text-xs text-slate-500">
-      {children}
-    </div>
-  );
-}
-
-/** Google Maps 키 없이도 동작하는 폴백 지도 */
-function MockMap({
-  items, selectedId, onDrag, onSelect,
-}: { items: Placed[]; selectedId: string | null; onDrag: DragFn; onSelect: (id: string) => void }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const toXY = (lat: number, lng: number) => ({
-    x: ((lng - BBOX.lngMin) / (BBOX.lngMax - BBOX.lngMin)) * 100,
-    y: ((BBOX.latMax - lat) / (BBOX.latMax - BBOX.latMin)) * 100,
-  });
-  const fromXY = (px: number, py: number) => ({
-    lng: BBOX.lngMin + (px / 100) * (BBOX.lngMax - BBOX.lngMin),
-    lat: BBOX.latMax - (py / 100) * (BBOX.latMax - BBOX.latMin),
-  });
-
-  const startDrag = (id: string) => (down: React.PointerEvent) => {
-    down.preventDefault();
-    onSelect(id);
-    const box = ref.current!.getBoundingClientRect();
-    const move = (e: PointerEvent) => {
-      const px = Math.min(100, Math.max(0, ((e.clientX - box.left) / box.width) * 100));
-      const py = Math.min(100, Math.max(0, ((e.clientY - box.top) / box.height) * 100));
-      const { lat, lng } = fromXY(px, py);
-      onDrag(id, lat, lng);
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  };
-
-  const pts = items.map((i) => ({ ...i, ...toXY(i.lat, i.lng) }));
-
-  return (
-    <div
-      ref={ref}
-      className="relative h-[240px] touch-none overflow-hidden rounded-xl border border-white/5 bg-[linear-gradient(0deg,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[length:24px_24px] bg-moose-dusk"
-    >
-      <span className="absolute left-2 top-2 text-[10px] text-slate-600">Mock Map · 하노이</span>
-      <svg className="pointer-events-none absolute inset-0 h-full w-full">
-        {pts.length > 1 && (
-          <polyline points={pts.map((p) => `${p.x}%,${p.y}%`).join(' ')} fill="none" stroke="#ee86a9" strokeWidth={2} strokeOpacity={0.8} />
-        )}
-      </svg>
-      {pts.map((p, idx) => {
-        const on = p.id === selectedId;
-        return (
-          <button
-            key={p.id}
-            onPointerDown={startDrag(p.id)}
-            style={{ left: `${p.x}%`, top: `${p.y}%` }}
-            className="absolute -translate-x-1/2 -translate-y-full cursor-grab touch-none active:cursor-grabbing"
-          >
-            <span className="flex flex-col items-center">
-              <span className={`flex items-center justify-center rounded-full border-2 border-white bg-moose-heart font-bold text-white ${
-                on ? 'h-7 w-7 text-xs shadow-[0_0_0_6px_rgba(238,134,169,0.3)]' : 'h-5 w-5 text-[10px]'
-              }`}>
-                {idx + 1}
-              </span>
-              <MapPin size={on ? 13 : 10} className="-mt-1 text-moose-heart" />
-            </span>
-          </button>
-        );
-      })}
-      {pts.length === 0 && (
-        <div className="flex h-full items-center justify-center text-xs text-slate-600">
-          아래 목록에서 &lsquo;지도에 배치&rsquo;를 눌러 핀을 추가하세요
-        </div>
-      )}
     </div>
   );
 }
