@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Copy, ArrowLeftRight, Languages } from 'lucide-react';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { cachedRate, toKrw, commas, fallbackRate } from '../lib/currency';
 import { currencyOf, currencyMeta, langOf, tzLabel } from '../lib/cities';
-import { PHRASE_GROUPS } from '../data/phrases';
+import { PHRASES, PHRASE_LOC, GROUP_ORDER } from '../data/phrases';
+import { translateEnabled, translateBatch } from '../lib/translate';
 
 type Sub = 'phrase' | 'fx';
 const gtUrl = (ko: string, tl: string) =>
@@ -36,14 +37,34 @@ export default function ToolsView() {
 
 function Phrasebook({ lang, tzText }: { lang: string; tzText: string }) {
   const [q, setQ] = useState('');
-  const isVi = lang === 'vi';
-  const groups = useMemo(() => {
-    if (!q.trim()) return PHRASE_GROUPS;
+  const loc = PHRASE_LOC[lang];                       // 큐레이션된 언어
+  const useApi = !loc && translateEnabled && lang !== 'ko';
+  const [api, setApi] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!useApi) return;
+    let alive = true;
+    translateBatch(PHRASES.map((p) => p.ko), lang).then((out) => {
+      if (!alive) return;
+      const m: Record<string, string> = {};
+      PHRASES.forEach((p, i) => { m[p.id] = out[i]; });
+      setApi(m);
+    });
+    return () => { alive = false; };
+  }, [lang, useApi]);
+
+  const native = (id: string): string | undefined => loc?.[id]?.t ?? (useApi ? api[id] : undefined);
+
+  const list = useMemo(() => {
     const n = q.trim().toLowerCase();
-    return PHRASE_GROUPS
-      .map((g) => ({ ...g, items: g.items.filter((p) => (p.ko + p.vi + p.pron).toLowerCase().includes(n)) }))
-      .filter((g) => g.items.length);
-  }, [q]);
+    const filtered = n
+      ? PHRASES.filter((p) => (p.ko + ' ' + (native(p.id) ?? '') + ' ' + (loc?.[p.id]?.pron ?? '')).toLowerCase().includes(n))
+      : PHRASES;
+    return GROUP_ORDER.map((g) => ({ title: g, items: filtered.filter((p) => p.group === g) })).filter((x) => x.items.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, loc, api, useApi]);
+
+  const showLink = !loc && !useApi;
 
   return (
     <div className="space-y-3">
@@ -53,32 +74,39 @@ function Phrasebook({ lang, tzText }: { lang: string; tzText: string }) {
         placeholder="상황·단어 검색 (택시, 계산…)"
         className="w-full rounded-lg bg-moose-edge px-3 py-2 text-sm text-slate-100 outline-none"
       />
-      {!isVi && (
+      {showLink && (
         <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-[11px] leading-relaxed text-slate-400">
-          {tzText || '이 여행지'}의 정식 회화집은 준비 중이에요. 지금은 한국어 문장을 눌러 <b className="text-slate-200">구글 번역</b>으로 바로 확인할 수 있어요.
+          {tzText || '이 여행지'}의 회화집은 아직 준비 중이에요. 지금은 한국어 문장을 눌러 <b className="text-slate-200">구글 번역</b>으로 바로 확인할 수 있어요.
         </p>
       )}
-      {groups.map((g) => (
+      {useApi && (
+        <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-[11px] text-slate-400">
+          구글 번역으로 자동 번역한 문장이에요 (발음 표기는 없음).
+        </p>
+      )}
+      {list.map((g) => (
         <div key={g.title}>
           <div className="mb-1.5 px-0.5 text-[11px] font-semibold text-slate-500">{g.title}</div>
           <div className="space-y-1.5">
-            {g.items.map((p) => (
-              isVi ? (
+            {g.items.map((p) => {
+              const t = native(p.id);
+              const pron = loc?.[p.id]?.pron;
+              return t ? (
                 <button
-                  key={p.vi}
-                  onClick={() => navigator.clipboard?.writeText(p.vi)}
+                  key={p.id}
+                  onClick={() => navigator.clipboard?.writeText(t)}
                   className="flex w-full items-center gap-2 rounded-xl border border-white/5 bg-moose-dusk/70 p-2.5 text-left active:bg-white/[0.06]"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="text-[13px] text-slate-300">{p.ko}</div>
-                    <div className="text-sm font-semibold text-white">{p.vi}</div>
-                    <div className="text-[11px] text-moose-heart">[{p.pron}]</div>
+                    <div className="text-sm font-semibold text-white">{t}</div>
+                    {pron && <div className="text-[11px] text-moose-heart">[{pron}]</div>}
                   </div>
                   <Copy size={13} className="shrink-0 text-slate-600" />
                 </button>
               ) : (
                 <a
-                  key={p.ko}
+                  key={p.id}
                   href={gtUrl(p.ko, lang)}
                   target="_blank"
                   rel="noreferrer"
@@ -87,13 +115,13 @@ function Phrasebook({ lang, tzText }: { lang: string; tzText: string }) {
                   <span className="min-w-0 flex-1 text-[13px] text-slate-200">{p.ko}</span>
                   <Languages size={14} className="shrink-0 text-moose-heart" />
                 </a>
-              )
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}
-      {groups.length === 0 && <p className="py-8 text-center text-xs text-slate-600">검색 결과가 없어요</p>}
-      {isVi && <p className="text-center text-[10px] text-slate-600">문장을 누르면 베트남어가 복사돼요 (택시 기사에게 보여주기)</p>}
+      {list.length === 0 && <p className="py-8 text-center text-xs text-slate-600">검색 결과가 없어요</p>}
+      {(loc || useApi) && <p className="text-center text-[10px] text-slate-600">문장을 누르면 현지어가 복사돼요 (점원·기사에게 보여주기)</p>}
     </div>
   );
 }
