@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Plus, ExternalLink, Check, Search, Map as MapIcon, X, Utensils, Navigation, PencilLine } from 'lucide-react';
 import type { EntryComment, PoiInfo, TripDoc } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
@@ -51,10 +51,24 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [mapSel, setMapSel] = useState<string | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null); // 행 클릭 → 이 장소 핀만
   const [geo, setGeo] = useState<Record<string, { lat: number; lng: number }>>({});
+  const mapRef = useRef<HTMLDivElement>(null);
 
   const results = useMemo(() => applyPlaceFilter(places, filter), [places, filter]);
   const detail = detailId ? places.find((p) => p.id === detailId) ?? null : null;
+  const focusPlace = focusId ? results.find((p) => p.id === focusId) ?? null : null;
+
+  const geocodePlace = (p: Place) => {
+    if (!geo[p.id] && KEY) geocode(p.origName || p.name).then((r) => { if (r) setGeo((m) => ({ ...m, [p.id]: r })); });
+  };
+  const focusOnMap = (p: Place) => {
+    setFocusId(p.id);
+    setMapSel(p.id);
+    setShowMap(true);
+    geocodePlace(p);
+    requestAnimationFrame(() => mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
 
   const addOne = (p: Place, d = day) => {
     mutate((doc) => {
@@ -104,14 +118,16 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
       if (row) row.poi = poi;
     });
 
+  const pointFor = (p: Place): MapPoint => {
+    const g = geo[p.id];
+    if (g) return { id: p.id, lat: g.lat, lng: g.lng };
+    const c = coordsForArea(p.area);
+    const j = jitter(p.id);
+    return { id: p.id, lat: c.lat + j.dlat, lng: c.lng + j.dlng };
+  };
   const points: MapPoint[] = useMemo(
-    () => results.slice(0, 80).map((p) => {
-      const g = geo[p.id];
-      if (g) return { id: p.id, lat: g.lat, lng: g.lng };
-      const c = coordsForArea(p.area);
-      const j = jitter(p.id);
-      return { id: p.id, lat: c.lat + j.dlat, lng: c.lng + j.dlng };
-    }),
+    () => results.slice(0, 80).map(pointFor),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [results, geo],
   );
 
@@ -149,7 +165,7 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
           <button onClick={() => setAdding(true)} className="flex items-center gap-0.5 text-slate-400">
             <PencilLine size={13} /> 직접 추가
           </button>
-          <button onClick={() => setShowMap((v) => !v)} className={`flex items-center gap-0.5 ${showMap ? 'text-moose-heart' : 'text-slate-400'}`}>
+          <button onClick={() => { setFocusId(null); setShowMap((v) => !v); }} className={`flex items-center gap-0.5 ${showMap && !focusPlace ? 'text-moose-heart' : 'text-slate-400'}`}>
             <MapIcon size={13} /> 지도
           </button>
           <button
@@ -164,17 +180,33 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
       {adding && <AddPlaceForm projectId={project.id} onDone={() => setAdding(false)} />}
 
       {showMap && (
-        <PlaceMap
-          points={points}
-          selectedId={mapSel}
-          onSelect={(id) => {
-            setMapSel(id);
-            const p = results.find((x) => x.id === id);
-            if (p && !geo[id] && KEY) geocode(p.origName || p.name).then((r) => { if (r) setGeo((m) => ({ ...m, [id]: r })); });
-          }}
-          height="160px"
-          hint="장소 미니맵 · 핀을 누르면 강조"
-        />
+        <div ref={mapRef}>
+          <div className="mb-1 flex items-center justify-between text-[11px]">
+            <span className="truncate font-semibold text-moose-heart">
+              {focusPlace ? `📍 ${focusPlace.name}` : '장소 미니맵'}
+            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              {focusPlace && (
+                <>
+                  <button onClick={() => setDetailId(focusPlace.id)} className="text-slate-300">상세 보기</button>
+                  <button onClick={() => setFocusId(null)} className="text-slate-400">전체 지도</button>
+                </>
+              )}
+              <button onClick={() => { setShowMap(false); setFocusId(null); }} className="text-slate-500"><X size={13} /></button>
+            </div>
+          </div>
+          <PlaceMap
+            points={focusPlace ? [pointFor(focusPlace)] : points}
+            selectedId={mapSel}
+            onSelect={(id) => {
+              setMapSel(id);
+              const p = results.find((x) => x.id === id);
+              if (p) geocodePlace(p);
+            }}
+            height="180px"
+            hint={focusPlace ? `${focusPlace.name} 위치` : '장소 미니맵 · 핀을 누르면 강조'}
+          />
+        </div>
       )}
 
       {/* 결과 — 숙소만 필터한 경우 비교표, 그 외엔 카드 목록 */}
@@ -189,9 +221,10 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
         {results.map((p) => (
           <div
             key={p.id}
-            onClick={() => (selMode ? toggle(p.id) : setDetailId(p.id))}
+            onClick={() => (selMode ? toggle(p.id) : focusOnMap(p))}
             className={`flex cursor-pointer items-center gap-2 rounded-xl border p-2.5 transition ${
-              picked.has(p.id) ? 'border-moose-heart bg-moose-heart/10' : 'border-white/5 bg-moose-dusk/70 hover:bg-white/[0.05]'
+              p.id === focusId ? 'border-moose-heart/60 bg-moose-heart/5'
+                : picked.has(p.id) ? 'border-moose-heart bg-moose-heart/10' : 'border-white/5 bg-moose-dusk/70 hover:bg-white/[0.05]'
             }`}
           >
             {selMode && (
@@ -201,7 +234,10 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
                 {picked.has(p.id) && <Check size={13} />}
               </span>
             )}
-            <div className="min-w-0 flex-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); selMode ? toggle(p.id) : setDetailId(p.id); }}
+              className="min-w-0 flex-1 text-left"
+            >
               <div className="flex items-center gap-1.5">
                 <span className="truncate text-sm font-semibold text-white">{p.name}</span>
                 {p.rating ? <span className="shrink-0 text-[10px] text-slate-400">★ {p.rating}</span> : null}
@@ -211,7 +247,7 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
                 {p.area && <span>📍 {splitAreas(p.area).join(' · ')}</span>}
                 {p.priceText && <span>· {p.priceText}</span>}
               </div>
-            </div>
+            </button>
             {!selMode && (
               <>
                 {p.mapUrl && (
