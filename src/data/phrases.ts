@@ -2,7 +2,7 @@
  * 여행 미니 회화 — 한국어 기준 문장(PHRASES) + 언어별 번역·한글발음(PHRASE_LOC).
  * 큐레이션된 언어(vi/ja/th/zh-TW)는 발음까지, 나머지는 구글 번역으로 보완.
  */
-export interface PhraseBase { id: string; ko: string; group: string }
+export interface PhraseBase { id: string; ko: string; group: string; apiKo?: string }
 export interface Loc { t: string; pron?: string }
 
 export const GROUP_ORDER = ['기본', '택시·교통', '식당·카페', '숫자', '도움 요청'] as const;
@@ -15,24 +15,24 @@ export const PHRASES: PhraseBase[] = [
   { id: 'yesno', ko: '네 / 아니요', group: '기본' },
   { id: 'howmuch', ko: '얼마예요?', group: '기본' },
   { id: 'expensive', ko: '너무 비싸요', group: '기본' },
-  { id: 'discount', ko: '깎아 주세요', group: '기본' },
+  { id: 'discount', ko: '깎아 주세요', group: '기본', apiKo: '조금 더 싸게 해 주세요' },
   { id: 'ok', ko: '괜찮아요', group: '기본' },
   // 택시·교통
   { id: 'goairport', ko: '공항으로 가주세요', group: '택시·교통' },
   { id: 'gohere', ko: '이 주소로 가주세요 (지도 보여주기)', group: '택시·교통' },
-  { id: 'meter', ko: '미터기 켜주세요', group: '택시·교통' },
+  { id: 'meter', ko: '미터기 켜주세요', group: '택시·교통', apiKo: '택시 미터기를 켜 주세요' },
   { id: 'stophere', ko: '여기서 세워주세요', group: '택시·교통' },
   { id: 'howlong', ko: '얼마나 걸려요?', group: '택시·교통' },
   { id: 'wait', ko: '잠깐 기다려 주세요', group: '택시·교통' },
   // 식당·카페
   { id: 'menu', ko: '메뉴 주세요', group: '식당·카페' },
-  { id: 'this', ko: '이거 주세요', group: '식당·카페' },
+  { id: 'this', ko: '이거 주세요', group: '식당·카페', apiKo: '이것을 주세요' },
   { id: 'notspicy', ko: '안 맵게 해주세요', group: '식당·카페' },
-  { id: 'noherb', ko: '고수(향채) 빼주세요', group: '식당·카페' },
-  { id: 'bill', ko: '계산해 주세요', group: '식당·카페' },
+  { id: 'noherb', ko: '고수(향채) 빼주세요', group: '식당·카페', apiKo: '고수는 빼 주세요' },
+  { id: 'bill', ko: '계산해 주세요', group: '식당·카페', apiKo: '계산서 주세요' },
   { id: 'delicious', ko: '맛있어요', group: '식당·카페' },
   { id: 'water', ko: '물 주세요', group: '식당·카페' },
-  { id: 'takeaway', ko: '포장해 주세요', group: '식당·카페' },
+  { id: 'takeaway', ko: '포장해 주세요', group: '식당·카페', apiKo: '음식을 포장해 주세요' },
   // 숫자
   { id: 'n123', ko: '1 / 2 / 3', group: '숫자' },
   { id: 'n456', ko: '4 / 5 / 6', group: '숫자' },

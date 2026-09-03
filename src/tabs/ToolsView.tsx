@@ -44,7 +44,7 @@ function Phrasebook({ lang, tzText }: { lang: string; tzText: string }) {
   useEffect(() => {
     if (!useApi) return;
     let alive = true;
-    translateBatch(PHRASES.map((p) => p.ko), lang).then((out) => {
+    translateBatch(PHRASES.map((p) => p.apiKo ?? p.ko), lang).then((out) => {
       if (!alive) return;
       const m: Record<string, string> = {};
       PHRASES.forEach((p, i) => { m[p.id] = out[i]; });
