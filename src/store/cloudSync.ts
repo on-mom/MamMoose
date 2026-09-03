@@ -40,6 +40,7 @@ function sanitizeDoc(doc: TripDoc): TripDoc {
 const stripId = (p: Project): Omit<Project, 'id'> => {
   const rest: Record<string, unknown> = { ...p };
   delete rest.id;
+  delete rest.ownerId; // 서버 trips.owner 가 진실 — meta 에 중복 저장 안 함
   return rest as Omit<Project, 'id'>;
 };
 const err = (msg: string | null) => useAppStore.getState().setCloudError(msg);
@@ -59,7 +60,7 @@ async function fetchTrips() {
   }
 
   err(null);
-  const projects: Project[] = rows.map((r) => ({ ...r.meta, id: r.id }));
+  const projects: Project[] = rows.map((r) => ({ ...r.meta, id: r.id, ownerId: r.owner }));
   const docs: Record<string, TripDoc> = {};
   for (const r of rows) docs[r.id] = sanitizeDoc(r.doc);
   applyingRemote = true;
@@ -178,6 +179,18 @@ export async function createInvite(tripId: string): Promise<{ code?: string; err
   const { error } = await supabase.from('invites').insert({ code, trip_id: tripId, invited_by: user.id });
   if (error) return { error: error.message };
   return { code };
+}
+
+/** 개설자가 동행자를 여행에서 제외 (trip_members 삭제 → 상대는 접근 불가). */
+export async function ejectMember(tripId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!supabase || !isCloudId(tripId)) return { ok: false, error: '클라우드 여행이 아닙니다' };
+  const { error } = await supabase
+    .from('trip_members')
+    .delete()
+    .eq('trip_id', tripId)
+    .eq('user_id', userId);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 export async function deleteCloudTrip(tripId: string) {

@@ -55,7 +55,8 @@ export function useRegisterMe() {
     const staleKeys = [cloudUser?.name, profile.displayName, '나'].filter(
       (n): n is string => !!n && n !== me && !!cur[n],
     );
-    if (cur[me]?.name === me && cur[me]?.avatar === wantAvatar && !staleKeys.length) return;
+    const uidWant = cloudUser?.id;
+    if (cur[me]?.name === me && cur[me]?.avatar === wantAvatar && cur[me]?.userId === uidWant && !staleKeys.length) return;
     mutate((doc) => {
       doc.people = doc.people ?? {};
       for (const k of staleKeys) delete doc.people[k];
@@ -63,8 +64,9 @@ export function useRegisterMe() {
         ...(doc.people[me] ?? { bg: null, statusMessage: '' }),
         name: me,
         avatar: wantAvatar,
+        ...(uidWant ? { userId: uidWant } : {}),
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, me, profile.avatarDataUrl, cloudUser?.avatar]);
+  }, [projectId, me, profile.avatarDataUrl, cloudUser?.avatar, cloudUser?.id]);
 }

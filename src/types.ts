@@ -34,6 +34,8 @@ export interface Project {
   budgetKrw?: number;
   /** 우리 여행 규칙 (고정 메모) */
   rules?: string;
+  /** 클라우드 여행 개설자의 user id (참여자 관리 권한 판별용). 로컬 여행은 없음 */
+  ownerId?: string;
 }
 
 /** 일정 탭 > 타임라인 항목. 동선 탭의 지도 마커와 양방향 동기화(Phase 2) */
@@ -183,6 +185,8 @@ export interface Person {
   avatar?: string | null;
   bg?: string | null;
   statusMessage?: string;
+  /** 클라우드 로그인 user id (개설자의 참여자 제외 기능용) */
+  userId?: string;
 }
 
 export interface ChatMessage {

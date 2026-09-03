@@ -7,7 +7,8 @@ import type { Project, Person } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { cloudEnabled, signOut } from '../lib/supabase';
-import { createInvite, acceptInvite, deleteCloudTrip } from '../store/cloudSync';
+import { createInvite, acceptInvite, deleteCloudTrip, ejectMember } from '../store/cloudSync';
+import { useMyName } from '../lib/members';
 import { Moose } from '../components/Moose';
 import CoupleMoose from '../components/CoupleMoose';
 import Modal from '../components/Modal';
@@ -319,28 +320,60 @@ type TripFormData = {
 const BLANK_FLIGHT: FlightForm = { date: '', flightNo: '', carrier: '', depAirport: '', depTime: '', arrAirport: '', arrTime: '' };
 const hasFlight = (fl: FlightForm) => fl.flightNo || fl.depAirport || fl.date;
 
-/** 여행 카드의 참여자 표시 — people 스냅샷 기준 ("이 여행을 열어본 사람") */
-function Participants({ people }: { people?: Record<string, Person> }) {
+/** 여행 카드의 참여자 표시 — people 스냅샷 기준. 개설자는 눌러서 참여자 관리. */
+function Participants({ projectId, people, isOwner }: {
+  projectId: string;
+  people?: Record<string, Person>;
+  isOwner: boolean;
+}) {
+  const mutate = useAppStore((s) => s.mutate);
+  const me = useMyName();
+  const [open, setOpen] = useState(false);
   const names = Object.keys(people ?? {}).filter((k) => k && k !== '나' && k.replace(/[\s.·・_-]/g, ''));
-  if (names.length === 0) {
-    return <span className="text-[11px] text-slate-600">참여자 없음</span>;
-  }
+
+  const eject = async (name: string) => {
+    if (!confirm(`'${name}'님을 이 여행에서 제외할까요?\n제외하면 상대는 더 이상 이 여행을 볼 수 없어요.`)) return;
+    const uidToKick = people?.[name]?.userId;
+    mutate((doc) => { if (doc.people) delete doc.people[name]; });
+    if (uidToKick) {
+      const r = await ejectMember(projectId, uidToKick);
+      if (!r.ok) alert('제외 처리 실패: ' + (r.error ?? '알 수 없음'));
+    }
+  };
+
+  if (names.length === 0) return <span className="text-[11px] text-slate-600">참여자 없음</span>;
+
   return (
-    <div className="flex min-w-0 items-center gap-1.5">
-      <div className="flex -space-x-1.5">
-        {names.slice(0, 4).map((n) => {
-          const av = people?.[n]?.avatar;
-          return (
-            <span key={n} className="h-5 w-5 overflow-hidden rounded-full border border-moose-dusk bg-moose-edge">
-              {av ? <img src={av} alt="" className="h-full w-full object-cover" />
-                : <Moose variant="face" className="h-full w-full object-cover" alt="" />}
-            </span>
-          );
-        })}
-      </div>
-      <span className="truncate text-[11px] text-slate-400">
-        {names.slice(0, 3).join(', ')}{names.length > 3 && ` 외 ${names.length - 3}`}
-      </span>
+    <div className="min-w-0">
+      <button onClick={() => isOwner && setOpen((v) => !v)} className="flex min-w-0 items-center gap-1.5" disabled={!isOwner}>
+        <div className="flex -space-x-1.5">
+          {names.slice(0, 4).map((n) => {
+            const av = people?.[n]?.avatar;
+            return (
+              <span key={n} className="h-5 w-5 overflow-hidden rounded-full border border-moose-dusk bg-moose-edge">
+                {av ? <img src={av} alt="" className="h-full w-full object-cover" />
+                  : <Moose variant="face" className="h-full w-full object-cover" alt="" />}
+              </span>
+            );
+          })}
+        </div>
+        <span className="truncate text-[11px] text-slate-400">
+          {names.slice(0, 3).join(', ')}{names.length > 3 && ` 외 ${names.length - 3}`}
+          {isOwner && ' · 관리'}
+        </span>
+      </button>
+      {open && isOwner && (
+        <div className="mt-1.5 space-y-1 rounded-lg bg-black/20 p-1.5">
+          {names.map((n) => (
+            <div key={n} className="flex items-center justify-between gap-2 px-1 text-[11px] text-slate-300">
+              <span className="truncate">{n}{n === me && ' (나 · 개설자)'}</span>
+              {n !== me && (
+                <button onClick={() => eject(n)} className="shrink-0 text-rose-400">제외</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -459,8 +492,12 @@ function Trips() {
                 )}
               </div>
             </div>
-            <div className="mt-2 flex items-center justify-between gap-2 border-t border-white/5 pt-2">
-              <Participants people={present[p.id]?.people} />
+            <div className="mt-2 flex items-start justify-between gap-2 border-t border-white/5 pt-2">
+              <Participants
+                projectId={p.id}
+                people={present[p.id]?.people}
+                isOwner={!!cloudUser && !!p.ownerId && p.ownerId === cloudUser.id}
+              />
               {cloudUser && (
                 <button onClick={() => makeInvite(p.id, p.name)} className="flex shrink-0 items-center gap-1 text-xs text-moose-heart">
                   <UserPlus size={13} /> 초대
