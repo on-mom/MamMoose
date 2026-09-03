@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Plus, ExternalLink, Check, Search, Map as MapIcon, X, Utensils, Navigation, PencilLine } from 'lucide-react';
+import { Plus, ExternalLink, Check, Search, Map as MapIcon, MapPin, X, Utensils, Navigation, PencilLine } from 'lucide-react';
 import type { EntryComment, PoiInfo, TripDoc } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
@@ -221,7 +221,7 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
         {results.map((p) => (
           <div
             key={p.id}
-            onClick={() => (selMode ? toggle(p.id) : focusOnMap(p))}
+            onClick={() => (selMode ? toggle(p.id) : setDetailId(p.id))}
             className={`flex cursor-pointer items-center gap-2 rounded-xl border p-2.5 transition ${
               p.id === focusId ? 'border-moose-heart/60 bg-moose-heart/5'
                 : picked.has(p.id) ? 'border-moose-heart bg-moose-heart/10' : 'border-white/5 bg-moose-dusk/70 hover:bg-white/[0.05]'
@@ -234,10 +234,7 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
                 {picked.has(p.id) && <Check size={13} />}
               </span>
             )}
-            <button
-              onClick={(e) => { e.stopPropagation(); selMode ? toggle(p.id) : setDetailId(p.id); }}
-              className="min-w-0 flex-1 text-left"
-            >
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="truncate text-sm font-semibold text-white">{p.name}</span>
                 {p.rating ? <span className="shrink-0 text-[10px] text-slate-400">★ {p.rating}</span> : null}
@@ -247,12 +244,19 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
                 {p.area && <span>📍 {splitAreas(p.area).join(' · ')}</span>}
                 {p.priceText && <span>· {p.priceText}</span>}
               </div>
-            </button>
+            </div>
             {!selMode && (
               <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); focusOnMap(p); }}
+                  className={`shrink-0 rounded-md p-1 ${p.id === focusId ? 'text-moose-heart' : 'text-slate-500 hover:text-moose-heart'}`}
+                  title="지도에서 위치 보기"
+                >
+                  <MapPin size={14} />
+                </button>
                 {p.mapUrl && (
                   <a href={p.mapUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
-                    className="shrink-0 text-slate-500 hover:text-moose-heart"><ExternalLink size={13} /></a>
+                    className="shrink-0 text-slate-500 hover:text-moose-heart" title="구글 지도로 열기"><ExternalLink size={13} /></a>
                 )}
                 <button
                   onClick={(e) => { e.stopPropagation(); addOne(p); }}
