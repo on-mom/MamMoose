@@ -36,3 +36,29 @@ self.addEventListener('fetch', (e) => {
     }),
   );
 });
+
+// ---------- 웹 푸시 (배포 후 발송 인프라 연동 시 동작) ----------
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data && e.data.text() }; }
+  e.waitUntil(
+    self.registration.showNotification(d.title || '맘무스', {
+      body: d.body || '',
+      icon: '/moose-face.png',
+      badge: '/moose-face.png',
+      data: { url: d.url || '/' },
+      tag: d.tag,
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const target = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+      for (const c of cs) if ('focus' in c) return c.focus();
+      return self.clients.openWindow(target);
+    }),
+  );
+});
