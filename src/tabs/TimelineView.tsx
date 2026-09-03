@@ -21,6 +21,7 @@ import { usePlaces } from '../lib/places';
 import Modal from '../components/Modal';
 import { PlaceFilterControls, applyPlaceFilter, emptyFilterState, type PlaceFilterState } from '../components/PlaceFilter';
 import CommentThread from '../components/CommentThread';
+import PhotoStrip from '../components/PhotoStrip';
 import { DiaryQuickWrite } from './DiaryView';
 
 const COL = 'col-'; // droppable 접두사
@@ -357,6 +358,7 @@ function ReadCard({
 }: { item: TimelineItem; highlight?: boolean; innerRef?: Ref<HTMLDivElement>; onOpen: () => void }) {
   const likes = item.likes ?? [];
   const comments = item.comments ?? [];
+  const photos = item.photos ?? [];
   return (
     <div ref={innerRef}>
       <button
@@ -371,6 +373,14 @@ function ReadCard({
           {item.lat != null && <MapPin size={11} className="shrink-0 text-emerald-500" />}
         </div>
         {item.memo && <div className="mt-1 truncate text-[11px] text-slate-400">{item.memo}</div>}
+        {photos.length > 0 && (
+          <div className="mt-1.5 flex gap-1">
+            {photos.slice(0, 4).map((u) => (
+              <img key={u} src={u} alt="" className="h-11 w-11 rounded-md object-cover" />
+            ))}
+            {photos.length > 4 && <span className="flex h-11 w-11 items-center justify-center rounded-md bg-white/5 text-[10px] text-slate-400">+{photos.length - 4}</span>}
+          </div>
+        )}
         {(likes.length > 0 || comments.length > 0) && (
           <div className="mt-1.5 flex items-center gap-2 text-[10px]">
             {likes.length > 0 && (
@@ -445,6 +455,11 @@ function ItemDetailModal({ item, onClose }: { item: TimelineItem; onClose: () =>
           )}
           {likes.length > 0 && <span className="text-[11px] text-slate-400">{likes.join(' · ')}</span>}
         </div>
+
+        <PhotoStrip
+          photos={item.photos}
+          onChange={(next) => patchItem((it) => { it.photos = next; })}
+        />
 
         <CommentThread
           comments={item.comments}

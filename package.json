@@ -17,6 +17,7 @@
     "@supabase/supabase-js": "^2.114.0",
     "big.js": "^6.2.2",
     "framer-motion": "^11.3.0",
+    "html2canvas": "^1.4.1",
     "lucide-react": "^0.400.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

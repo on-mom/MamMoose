@@ -1,5 +1,17 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+
+/** localStorage 래퍼 — 용량 초과(quota)로 저장 실패해도 앱이 죽지 않게. */
+const safeStorage = {
+  getItem: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
+  setItem: (k: string, v: string) => {
+    try { localStorage.setItem(k, v); }
+    catch (e) {
+      console.warn('[mammoose] 로컬 저장 실패(용량 초과 가능). 클라우드 로그인 시 안전합니다.', e);
+    }
+  },
+  removeItem: (k: string) => { try { localStorage.removeItem(k); } catch { /* noop */ } },
+};
 import type {
   AppSettings, Project, TabKey, TripDoc, UserProfile,
 } from '../types';
@@ -207,10 +219,26 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'mammoose-store',
-      version: 6,
+      version: 7,
+      storage: createJSONStorage(() => safeStorage),
       migrate: (persisted: any, from) => {
         if (from < 2 && persisted?.settings?.fixedVndToKrw === '0.0546') {
           persisted.settings.fixedVndToKrw = DEFAULT_VND_KRW;
+        }
+        if (from < 7) {
+          // 프로필 사진/배경이 큰 data URL 로 저장돼 있으면 제거 (quota 초과 원인).
+          // 앞으로는 로그인 시 Storage URL 로만 저장됨. 사용자가 다시 올리면 됨.
+          const big = (v: any) => typeof v === 'string' && v.startsWith('data:') && v.length > 120000;
+          if (persisted?.profile) {
+            if (big(persisted.profile.chatBgDataUrl)) persisted.profile.chatBgDataUrl = null;
+            if (big(persisted.profile.avatarDataUrl)) persisted.profile.avatarDataUrl = null;
+          }
+          for (const doc of Object.values(persisted?.present ?? {}) as any[]) {
+            for (const p of Object.values(doc?.people ?? {}) as any[]) {
+              if (big(p?.bg)) delete p.bg;
+              if (big(p?.avatar)) delete p.avatar;
+            }
+          }
         }
         if (from < 6) {
           // 채팅 배경(bg)은 더 이상 동기화 안 함 — 용량 큰 사진이 doc/localStorage quota 초과시킴.

@@ -5,6 +5,7 @@ import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { useMyName } from '../lib/members';
 import { Moose, MooseEmpty } from '../components/Moose';
+import PhotoStrip from '../components/PhotoStrip';
 
 export const MOODS = ['😍', '🥰', '😌', '😆', '😴', '🥲', '😤', '🤔'];
 
@@ -24,13 +25,14 @@ function useDiary() {
   const project = useActiveProject()!;
   const author = useMyName();
   const mutate = useAppStore((s) => s.mutate);
-  const add = (text: string, mood?: string, date?: string) => {
+  const add = (text: string, mood?: string, photos?: string[], date?: string) => {
     const t = text.trim();
-    if (!t) return;
+    if (!t && !(photos && photos.length)) return;
     mutate((doc) => {
       (doc.diary ??= []).push({
         id: uid(), projectId: project.id,
         date: date || tripToday(project), author, text: t, mood,
+        photos: photos && photos.length ? photos : undefined,
         createdAt: Date.now(),
       });
     });
@@ -93,9 +95,13 @@ export default function DiaryView() {
   const { add, patch, remove, author, project } = useDiary();
   const [text, setText] = useState('');
   const [mood, setMood] = useState<string>('');
+  const [photos, setPhotos] = useState<string[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
 
-  const submit = () => { add(text, mood || undefined); setText(''); setMood(''); };
+  const submit = () => {
+    add(text, mood || undefined, photos);
+    setText(''); setMood(''); setPhotos([]);
+  };
 
   const grouped = useMemo(() => {
     const g = new Map<string, DiaryEntry[]>();
@@ -119,6 +125,7 @@ export default function DiaryView() {
           rows={2}
           className="w-full resize-none rounded-lg bg-moose-edge px-3 py-2 text-sm text-slate-100 outline-none"
         />
+        <PhotoStrip photos={photos} onChange={setPhotos} max={4} />
         <div className="flex items-center justify-between">
           <div className="flex gap-1">
             {MOODS.map((m) => (
@@ -131,7 +138,7 @@ export default function DiaryView() {
               </button>
             ))}
           </div>
-          <button onClick={submit} disabled={!text.trim()} className="btn-heart rounded-lg px-4 py-1.5 text-sm font-semibold disabled:opacity-40">
+          <button onClick={submit} disabled={!text.trim() && photos.length === 0} className="btn-heart rounded-lg px-4 py-1.5 text-sm font-semibold disabled:opacity-40">
             남기기
           </button>
         </div>
@@ -174,6 +181,15 @@ export default function DiaryView() {
                   />
                 ) : (
                   <div className="text-[13px] leading-relaxed text-slate-100">{e.text}</div>
+                )}
+                {(e.photos?.length || mine) && (
+                  <div className="mt-2">
+                    <PhotoStrip
+                      photos={e.photos}
+                      editable={mine}
+                      onChange={(next) => patch(e.id, { photos: next.length ? next : undefined })}
+                    />
+                  </div>
                 )}
               </div>
             );

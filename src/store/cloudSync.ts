@@ -24,11 +24,15 @@ let currentUid: string | null = null;
 
 const isCloudId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-/.test(id);
 
-/** 클라우드에 저장하지 않는 것 정리: 채팅 배경(용량 큰 사진 → quota 초과) */
+/** 큰 data URL 이미지가 doc 에 섞여 들어가면 quota/전송 부담 → 제거.
+ *  http(s) URL(Storage 업로드분)은 작으므로 유지. */
 function sanitizeDoc(doc: TripDoc): TripDoc {
+  const big = (v: unknown) => typeof v === 'string' && v.startsWith('data:') && v.length > 60000;
   if (doc?.people) {
     for (const p of Object.values(doc.people)) {
-      if (p && 'bg' in p) delete (p as { bg?: unknown }).bg;
+      const o = p as { bg?: unknown; avatar?: unknown };
+      if (big(o.bg)) delete o.bg;
+      if (big(o.avatar)) delete o.avatar;
     }
   }
   return doc;

@@ -32,6 +32,8 @@ export interface Project {
   inboundFlight?: string;
   /** 이 여행 예산 (KRW). 초과 시 가계부에 "예쁜 지출" 도장 */
   budgetKrw?: number;
+  /** 우리 여행 규칙 (고정 메모) */
+  rules?: string;
 }
 
 /** 일정 탭 > 타임라인 항목. 동선 탭의 지도 마커와 양방향 동기화(Phase 2) */
@@ -54,6 +56,8 @@ export interface TimelineItem {
   likes?: string[];
   /** 코멘트 (참여자별) */
   comments?: TimelineComment[];
+  /** 첨부 사진 (Supabase Storage URL 또는 압축 data URL) */
+  photos?: string[];
 }
 
 /** 참여자 댓글 — 타임라인·장소·맛집·숙소 모달 공용 */
@@ -193,6 +197,8 @@ export interface DiaryEntry {
   /** 기분 이모지 (선택) */
   mood?: string;
   createdAt: number;
+  /** 첨부 사진 */
+  photos?: string[];
 }
 
 /** MY 탭 > 설정 + 앱 전역 설정 */

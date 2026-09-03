@@ -1,9 +1,12 @@
-import { useMemo } from 'react';
+import { useState } from 'react';
 import { Heart, MapPin } from 'lucide-react';
-import { useAppStore, useActiveProject } from '../store/useAppStore';
-import { useMemberNames } from '../lib/members';
+import { useActiveProject } from '../store/useAppStore';
 import { MooseEmpty } from '../components/Moose';
 import CoupleMoose from '../components/CoupleMoose';
+import TripSummary from './TripSummary';
+import { useMemoryPicks } from '../lib/memories';
+
+export { useMemoryPicks, tripEnded } from '../lib/memories';
 
 const dayLabel = (start: string, day: number) => {
   const d = new Date(start + 'T00:00:00');
@@ -11,30 +14,11 @@ const dayLabel = (start: string, day: number) => {
   return `${day}일차 · ${d.getMonth() + 1}/${d.getDate()}`;
 };
 
-/** 참여자 전원이 좋아요 한 타임라인 항목(교집합) */
-export function useMemoryPicks() {
-  const timeline = useAppStore((s) => s.present[s.activeProjectId]?.timeline ?? []);
-  const members = useMemberNames();
-  return useMemo(() => {
-    if (members.length === 0) return [];
-    return [...timeline]
-      .filter((it) => {
-        const likes = it.likes ?? [];
-        return likes.length > 0 && members.every((m) => likes.includes(m));
-      })
-      .sort((a, b) => a.day - b.day || a.order - b.order);
-  }, [timeline, members]);
-}
-
-/** 오늘이 여행 종료일을 지났는지 */
-export function tripEnded(p: { endDate: string }) {
-  return new Date().toISOString().slice(0, 10) > p.endDate;
-}
-
 /** MY › 추억함 — 참여자 전원이 좋아요 한 타임라인 항목(교집합) 모아보기. 여행 후 회고용. */
 export default function MemoriesView() {
   const project = useActiveProject()!;
   const picks = useMemoryPicks();
+  const [tab, setTab] = useState<'list' | 'card'>('list');
 
   return (
     <div className="space-y-3 overflow-y-auto pb-2">
@@ -45,14 +29,25 @@ export default function MemoriesView() {
         <div className="text-[11px] text-slate-400">둘 다 ♥ 누른 곳 {picks.length}곳</div>
       </div>
 
-      {picks.length === 0 && (
+      <div className="flex gap-1 rounded-lg bg-moose-edge p-1 text-xs">
+        {([['list', '좋아한 곳'], ['card', '여행 요약 카드']] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setTab(k)}
+            className={`flex-1 rounded-md py-1.5 ${tab === k ? 'bg-moose-heart text-white' : 'text-slate-400'}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'card' && <TripSummary />}
+
+      {tab === 'list' && picks.length === 0 && (
         <MooseEmpty
           line="둘 다 좋아한 곳이 아직 없어요"
           sub="일정 › 타임라인 [읽기] 모드에서 좋아요를 남겨보세요"
         />
       )}
 
-      {picks.map((it) => {
+      {tab === 'list' && picks.map((it) => {
         const comments = it.comments ?? [];
         return (
           <div key={it.id} className="rounded-xl border border-white/5 bg-moose-dusk/70 p-3">

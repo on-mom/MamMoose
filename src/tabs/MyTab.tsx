@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Check, LogOut, Plus, Send, Camera, Image as ImageIcon, UserPlus, Copy, AlertTriangle,
-  MoreVertical, Pencil, Trash2,
+  MoreVertical, Pencil, Trash2, Loader2,
 } from 'lucide-react';
 import type { Project, Person } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
@@ -9,6 +9,7 @@ import { uid } from '../lib/uid';
 import { cloudEnabled, signOut } from '../lib/supabase';
 import { createInvite, acceptInvite, deleteCloudTrip } from '../store/cloudSync';
 import { Moose } from '../components/Moose';
+import CoupleMoose from '../components/CoupleMoose';
 import Modal from '../components/Modal';
 import { outboundText, inboundText, carrierOf } from '../lib/flight';
 import { CITY_TZ } from '../lib/cities';
@@ -16,7 +17,7 @@ import DiaryView from './DiaryView';
 import ToolsView from './ToolsView';
 import MemoriesView, { useMemoryPicks, tripEnded } from './MemoriesView';
 import { ensureNotifyPermission, fireLocalNotification, alreadyNotified, markNotified, canNotify } from '../lib/notify';
-import { compressImage } from '../lib/image';
+import { uploadPhoto } from '../lib/photos';
 
 type Sub = 'chat' | 'diary' | 'memories' | 'tools' | 'trips' | 'settings';
 const hhmm = (ts: number) =>
@@ -98,14 +99,17 @@ function Chat() {
   const myName = cloudUser?.name || profile.displayName || '나';
   const myAvatar = cloudUser?.avatar || profile.avatarDataUrl;
 
+  const [uploading, setUploading] = useState(false);
+
   /** 내 프로필 스냅샷을 채팅방(TripDoc)에 반영 — 동행자에게도 동기화됨.
-   *  배경(bg)은 개인 취향 + 용량 커서 동기화 안 함(각자 자기 채팅 배경). */
+   *  로그인 시 아바타·배경은 Storage URL(작음) 이라 배경도 함께 동기화. */
   const syncMe = (over: Partial<Person> = {}) =>
     mutate((doc) => {
       doc.people = doc.people ?? {};
       doc.people[myName] = {
         name: myName,
         avatar: myAvatar ?? null,
+        bg: profile.chatBgDataUrl ?? null,
         statusMessage: profile.statusMessage ?? '',
         ...over,
       };
@@ -115,15 +119,19 @@ function Chat() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    setUploading(true);
+    setErr('');
     try {
-      // 아바타는 작게(256), 배경은 화면폭(1200). 원본 저장 시 localStorage quota 초과.
-      const url = which === 'avatarDataUrl'
-        ? await compressImage(file, 256, 0.82)
-        : await compressImage(file, 1200, 0.68);
+      // 로그인 시 Supabase Storage 업로드(URL 저장) → localStorage quota 문제 원천 차단.
+      // 로컬 모드면 uploadPhoto 가 작게 압축한 data URL 반환.
+      const url = await uploadPhoto(file);
       setProfile({ [which]: url });
-      setErr('');
-      if (which === 'avatarDataUrl') syncMe({ avatar: url });
-    } catch (x) { setErr((x as Error).message); }
+      syncMe(which === 'avatarDataUrl' ? { avatar: url } : { bg: url });
+    } catch (x) {
+      setErr((x as Error).message || '사진을 불러오지 못했어요');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const send = () => {
@@ -159,7 +167,7 @@ function Chat() {
       {/* 내 프로필 */}
       <div className="card space-y-2 p-3">
         <div className="flex items-center gap-3">
-          <button onClick={() => avatarInput.current?.click()} className="relative">
+          <button onClick={() => avatarInput.current?.click()} disabled={uploading} className="relative">
             {myAvatar ? (
               <img src={myAvatar} alt="" className="h-12 w-12 rounded-full object-cover" />
             ) : (
@@ -167,7 +175,9 @@ function Chat() {
                 <Moose variant="face" className="h-full w-full object-cover" alt="" />
               </div>
             )}
-            <Camera size={12} className="absolute -bottom-0.5 -right-0.5 rounded-full bg-moose-night p-[1px] text-slate-300" />
+            {uploading
+              ? <Loader2 size={12} className="absolute -bottom-0.5 -right-0.5 animate-spin rounded-full bg-moose-night p-[1px] text-moose-heart" />
+              : <Camera size={12} className="absolute -bottom-0.5 -right-0.5 rounded-full bg-moose-night p-[1px] text-slate-300" />}
           </button>
           <input
             value={profile.displayName}
@@ -176,16 +186,19 @@ function Chat() {
             placeholder="프로필명"
             className="flex-1 bg-transparent text-sm font-semibold text-white outline-none"
           />
-          {profile.chatBgDataUrl ? (
-            <button onClick={() => setProfile({ chatBgDataUrl: null })} className="flex items-center gap-1 text-[11px] text-slate-400">
-              <ImageIcon size={13} /> 배경 지우기
-            </button>
-          ) : (
-            <button onClick={() => bgInput.current?.click()} className="flex items-center gap-1 text-[11px] text-slate-400">
-              <ImageIcon size={13} /> 배경
-            </button>
-          )}
+          <button
+            onClick={() => setViewPerson(personOf(myName))}
+            className="flex items-center gap-1 text-[11px] text-slate-400"
+          >
+            내 프로필 보기
+          </button>
+          <button onClick={() => bgInput.current?.click()} disabled={uploading} className="flex items-center gap-1 text-[11px] text-slate-400">
+            <ImageIcon size={13} /> 배경
+          </button>
         </div>
+        {profile.chatBgDataUrl && (
+          <button onClick={() => { setProfile({ chatBgDataUrl: null }); syncMe({ bg: null }); }} className="text-[10px] text-slate-500">배경 지우기</button>
+        )}
         <input
           value={profile.statusMessage ?? ''}
           onChange={(e) => setProfile({ statusMessage: e.target.value })}
@@ -244,22 +257,28 @@ function Chat() {
       </div>
 
       {viewPerson && (
-        <Modal onClose={() => setViewPerson(null)} title={<span className="text-xs font-semibold text-slate-400">프로필</span>}>
+        <Modal onClose={() => setViewPerson(null)}>
           <div className="-mx-5 -my-4">
+            {/* 카톡식 — 배경 크게, 아바타가 하단에 걸침 */}
             <div
-              className="h-28 bg-moose-edge bg-cover bg-center"
-              style={viewPerson.bg ? { backgroundImage: `url(${viewPerson.bg})` } : undefined}
-            />
-            <div className="flex flex-col items-center px-4 pb-1">
-              <div className="-mt-9 h-16 w-16 overflow-hidden rounded-full border-2 border-moose-night bg-moose-edge">
-                {viewPerson.avatar
-                  ? <img src={viewPerson.avatar} alt="" className="h-full w-full object-cover" />
-                  : <Moose variant="face" className="h-full w-full object-cover" alt="" />}
+              className="relative h-56 bg-cover bg-center"
+              style={{
+                backgroundImage: viewPerson.bg
+                  ? `linear-gradient(to bottom, transparent 55%, rgba(0,0,0,.55)), url(${viewPerson.bg})`
+                  : 'linear-gradient(160deg,#3a2733,#221b2c)',
+              }}
+            >
+              <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 px-5 pb-4">
+                <div className="h-20 w-20 overflow-hidden rounded-full border-2 border-white/80 bg-moose-edge shadow-lg">
+                  {viewPerson.avatar
+                    ? <img src={viewPerson.avatar} alt="" className="h-full w-full object-cover" />
+                    : <Moose variant="face" className="h-full w-full object-cover" alt="" />}
+                </div>
+                <div className="text-lg font-bold text-white drop-shadow">{viewPerson.name}</div>
+                {viewPerson.statusMessage && (
+                  <div className="text-center text-[13px] text-white/80 drop-shadow">{viewPerson.statusMessage}</div>
+                )}
               </div>
-              <div className="mt-2 text-base font-bold text-white">{viewPerson.name}</div>
-              {viewPerson.statusMessage
-                ? <div className="mt-0.5 text-center text-[13px] text-slate-400">{viewPerson.statusMessage}</div>
-                : <div className="mt-0.5 text-[12px] text-slate-600">상태 메시지 없음</div>}
             </div>
           </div>
         </Modal>
@@ -343,8 +362,12 @@ function Trips() {
     setDelTarget(null);
   };
 
+  const active = projects.find((p) => p.id === activeId);
+
   return (
     <div className="space-y-2 overflow-y-auto" onClick={() => setMenuId(null)}>
+      {active && <TripHeadline project={active} onEditRules={(v) => patchProject(active.id, { rules: v })} />}
+
       {projects.map((p) =>
         editId === p.id ? (
           <TripForm key={p.id} initial={p} onSubmit={(d) => saveEdit(p.id, d)} onCancel={() => setEditId(null)} />
@@ -480,6 +503,60 @@ function Trips() {
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+/* ---------- D-day 위젯 + 여행 규칙 ---------- */
+function ddayText(start: string, end: string): { big: string; sub: string } {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const s = new Date(start + 'T00:00:00');
+  const e = new Date((end || start) + 'T00:00:00');
+  const diff = Math.round((s.getTime() - today.getTime()) / 86400000);
+  if (diff > 0) return { big: `D-${diff}`, sub: '출발까지' };
+  if (today <= e) return { big: `${Math.round((today.getTime() - s.getTime()) / 86400000) + 1}일차`, sub: '여행 중' };
+  const past = Math.round((today.getTime() - e.getTime()) / 86400000);
+  return { big: `D+${past}`, sub: '여행 후' };
+}
+
+function TripHeadline({ project, onEditRules }: { project: Project; onEditRules: (v: string) => void }) {
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const dd = ddayText(project.startDate, project.endDate);
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-moose-heart/20 to-transparent p-3">
+        <CoupleMoose className="w-20 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="font-title truncate text-sm font-bold text-white">{project.name}</div>
+          <div className="truncate text-[11px] text-slate-400">{project.destination || '여행지 미정'} · {project.startDate}~{project.endDate}</div>
+          <div className="mt-1 flex items-baseline gap-1.5">
+            <span className="font-title text-2xl font-bold text-moose-heart">{dd.big}</span>
+            <span className="text-[11px] text-slate-500">{dd.sub}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-white/5 bg-moose-dusk/70">
+        <button onClick={() => setRulesOpen((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-left">
+          <span className="text-sm">📌</span>
+          <span className="flex-1 text-[12px] font-semibold text-slate-300">우리 여행 규칙</span>
+          {!rulesOpen && project.rules && <span className="max-w-[45%] truncate text-[11px] text-slate-500">{project.rules.split('\n')[0]}</span>}
+          <span className="text-slate-500">{rulesOpen ? '접기' : '펼치기'}</span>
+        </button>
+        {rulesOpen && (
+          <div className="border-t border-white/5 p-3">
+            <textarea
+              key={project.id}
+              defaultValue={project.rules ?? ''}
+              onBlur={(e) => e.target.value !== (project.rules ?? '') && onEditRules(e.target.value)}
+              rows={4}
+              placeholder={'ex) 기상 8시 · 하루 예산 10만원\nex) 사진은 서로 3장씩 남기기\nex) 싸우면 분짜 먹으러 가기'}
+              className="w-full resize-none rounded-lg bg-moose-edge px-3 py-2 text-[13px] leading-relaxed text-slate-100 outline-none"
+            />
+            <p className="mt-1 text-[10px] text-slate-600">칸을 벗어나면 저장돼요 · 동행자에게도 공유됩니다</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
