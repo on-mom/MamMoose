@@ -15,7 +15,9 @@ import { uid } from '../lib/uid';
 import { computeFocus } from '../lib/timezone';
 import { coordsForArea } from '../lib/areaCoords';
 import { useMemberNames, useMyName } from '../lib/members';
+import { usePlaces } from '../lib/places';
 import Modal from '../components/Modal';
+import PlaceFilter from '../components/PlaceFilter';
 import { DiaryQuickWrite } from './DiaryView';
 
 const COL = 'col-'; // droppable 접두사
@@ -42,8 +44,7 @@ function boardFromItems(items: TimelineItem[], days: number): Board {
 export default function TimelineView() {
   const project = useActiveProject()!;
   const items = useAppStore((s) => s.present[s.activeProjectId]?.timeline ?? []);
-  const spots = useAppStore((s) => s.present[s.activeProjectId]?.spots ?? []);
-  const restaurants = useAppStore((s) => s.present[s.activeProjectId]?.restaurants ?? []);
+  const places = usePlaces();
   const mutate = useAppStore((s) => s.mutate);
   const days = tripDays(project.startDate, project.endDate);
   const [picker, setPicker] = useState(false);
@@ -203,40 +204,26 @@ export default function TimelineView() {
                 </button>
               ))}
             </div>
-            {spots.length > 0 && (
-              <div>
-                <div className="pb-1 text-[11px] font-semibold text-slate-500">추천 관광지 TOP{spots.length}</div>
-                <div className="space-y-1">
-                  {spots.map((sp) => (
+            <PlaceFilter
+              places={places}
+              compact
+              render={(filtered) => (
+                <div className="max-h-64 space-y-1 overflow-y-auto">
+                  {filtered.slice(0, 60).map((p) => (
                     <button
-                      key={sp.id}
-                      onClick={() => addPlace(sp.name, sp.area, sp.tip)}
+                      key={p.id}
+                      onClick={() => addPlace(p.name, p.area, p.menu || p.note || '')}
                       className="flex w-full items-center gap-2 rounded-lg bg-white/[0.03] px-2.5 py-2 text-left text-xs hover:bg-white/[0.06]"
                     >
                       <Plus size={13} className="shrink-0 text-moose-heart" />
-                      <span className="min-w-0 flex-1 truncate text-slate-200">{sp.name}</span>
-                      <span className="shrink-0 text-[10px] text-slate-500">{sp.area}</span>
+                      <span className="min-w-0 flex-1 truncate text-slate-200">{p.name}</span>
+                      <span className="shrink-0 text-[10px] text-slate-500">{p.area}</span>
                     </button>
                   ))}
+                  {filtered.length === 0 && <p className="py-6 text-center text-[11px] text-slate-600">조건에 맞는 장소가 없어요</p>}
                 </div>
-              </div>
-            )}
-            <div>
-              <div className="pb-1 text-[11px] font-semibold text-slate-500">맛집 · 카페</div>
-              <div className="max-h-40 space-y-1 overflow-y-auto">
-                {restaurants.slice(0, 30).map((r) => (
-                  <button
-                    key={r.id}
-                    onClick={() => addPlace(r.nameKo || r.name, r.area, r.menu || r.note)}
-                    className="flex w-full items-center gap-2 rounded-lg bg-white/[0.03] px-2.5 py-2 text-left text-xs hover:bg-white/[0.06]"
-                  >
-                    <Plus size={13} className="shrink-0 text-moose-heart" />
-                    <span className="min-w-0 flex-1 truncate text-slate-200">{r.nameKo || r.name}</span>
-                    <span className="shrink-0 text-[10px] text-slate-500">{r.area}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+              )}
+            />
             <p className="text-center text-[10px] text-slate-600">담으면 {pickerDay}일차에 추가돼요 · 시간·순서는 드래그로 조정</p>
           </div>
         </Modal>
