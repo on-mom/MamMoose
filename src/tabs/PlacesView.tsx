@@ -4,7 +4,7 @@ import type { EntryComment, PoiInfo, TripDoc } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { useMyName } from '../lib/members';
-import { usePlaces, splitAreas, KIND_LABEL, type Place, type PlaceKind } from '../lib/places';
+import { usePlaces, splitAreas, isSeedPlace, KIND_LABEL, type Place, type PlaceKind } from '../lib/places';
 import { coordsForArea, AREA_COORDS } from '../lib/areaCoords';
 import { geocode } from '../lib/geocode';
 import { directionsUrl } from '../lib/maps';
@@ -384,16 +384,25 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
 
             {detail.kind === 'stay' && <StayExtra place={detail} />}
 
-            <PoiSection place={detail} onSave={(poi) => patchPoi(detail, poi)} />
+            {isSeedPlace(detail.id) ? (
+              <div className="rounded-xl bg-white/[0.04] p-3 text-[12px] text-slate-400">
+                여행지 기본 제공 장소예요. [{day}일차에 담기]를 누르면 내 일정에 추가되고,
+                그때부터 코멘트·지도 정보를 남길 수 있어요.
+              </div>
+            ) : (
+              <>
+                <PoiSection place={detail} onSave={(poi) => patchPoi(detail, poi)} />
 
-            <CommentThread
-              comments={detail.comments}
-              onAdd={(t, mentions) => {
-                patchComments(detail, (list) => [...list, { id: uid(), author: me, text: t, at: Date.now(), mentions: mentions.length ? mentions : undefined }]);
-                if (mentions.length) pushNotify(mentions, `${me}님이 언급했어요`, `${detail.name} · "${firstSentence(t)}"`);
-              }}
-              onDelete={(cid) => patchComments(detail, (list) => list.filter((c) => c.id !== cid))}
-            />
+                <CommentThread
+                  comments={detail.comments}
+                  onAdd={(t, mentions) => {
+                    patchComments(detail, (list) => [...list, { id: uid(), author: me, text: t, at: Date.now(), mentions: mentions.length ? mentions : undefined }]);
+                    if (mentions.length) pushNotify(mentions, `${me}님이 언급했어요`, `${detail.name} · "${firstSentence(t)}"`);
+                  }}
+                  onDelete={(cid) => patchComments(detail, (list) => list.filter((c) => c.id !== cid))}
+                />
+              </>
+            )}
           </div>
         </Modal>
       )}
