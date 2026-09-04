@@ -1,7 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { stashInviteFromUrl } from './store/cloudSync';
 import './index.css';
+
+stashInviteFromUrl(); // 초대 링크(?invite=)로 들어왔으면 코드 보관 → 로그인 후 자동 참여
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

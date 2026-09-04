@@ -211,6 +211,7 @@ export function initCloudSync() {
       bootstrapTried = false;
       await fetchTrips();       // fetchTrips 안에서 내 여행 id 로 realtime 구독
       startPushWatcher();
+      await consumePendingInvite();
     } else {
       teardown();
       useAppStore.getState().resetLocal();
@@ -318,4 +319,27 @@ export async function acceptInvite(code: string): Promise<{ ok: boolean; error?:
   await fetchTrips();
   if (typeof data === 'string') useAppStore.getState().setActiveProject(data);
   return { ok: true };
+}
+
+const PENDING_INVITE_KEY = 'mammoose-pending-invite';
+
+/** 초대 링크(?invite=CODE)로 들어온 경우, 로그인 전이면 코드를 보관해 뒀다가 로그인 후 자동 참여. */
+export function stashInviteFromUrl(): void {
+  try {
+    const code = new URLSearchParams(location.search).get('invite');
+    if (!code) return;
+    localStorage.setItem(PENDING_INVITE_KEY, code.trim().toUpperCase());
+    const url = new URL(location.href);
+    url.searchParams.delete('invite');
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+  } catch { /* noop */ }
+}
+
+async function consumePendingInvite(): Promise<void> {
+  let code: string | null = null;
+  try { code = localStorage.getItem(PENDING_INVITE_KEY); } catch { /* noop */ }
+  if (!code) return;
+  try { localStorage.removeItem(PENDING_INVITE_KEY); } catch { /* noop */ }
+  const r = await acceptInvite(code);
+  err(r.ok ? null : (r.error ?? '초대 참여에 실패했어요'));
 }

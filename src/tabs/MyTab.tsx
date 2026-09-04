@@ -405,11 +405,21 @@ function Trips() {
     const r = await createInvite(tripId);
     setModal({ tripName, code: r.code, error: r.error });
   };
+  const flash = () => { setCopied(true); setTimeout(() => setCopied(false), 1500); };
   const copyCode = () => {
     if (!modal?.code) return;
     navigator.clipboard?.writeText(modal.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    flash();
+  };
+  const shareInvite = async (code: string, tripName: string) => {
+    const link = `${location.origin}/?invite=${code}`;
+    const text = `'${tripName}' 여행에 초대합니다 ✈️`;
+    if (navigator.share) {
+      try { await navigator.share({ title: '맘무스 여행 초대', text, url: link }); } catch { /* 사용자 취소 */ }
+      return;
+    }
+    try { await navigator.clipboard?.writeText(`${text}\n${link}`); } catch { /* noop */ }
+    flash();
   };
   const join = async () => {
     if (!joinCode.trim()) return;
@@ -581,13 +591,18 @@ function Trips() {
                 <div className="rounded-2xl bg-moose-heart/10 py-5">
                   <div className="font-mono text-[34px] font-bold tracking-[0.3em] text-moose-heart">{modal.code}</div>
                 </div>
-                <button onClick={copyCode} className="btn-heart flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold">
-                  <Copy size={15} /> {copied ? '복사됨!' : '코드 복사'}
+                <button
+                  onClick={() => shareInvite(modal.code!, modal.tripName)}
+                  className="btn-heart flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold"
+                >
+                  <Copy size={15} /> {copied ? '복사됨!' : '초대 링크 공유'}
+                </button>
+                <button onClick={copyCode} className="text-[11px] text-slate-400 underline">
+                  코드만 복사 ({modal.code})
                 </button>
                 <p className="text-[11px] leading-relaxed text-slate-500">
-                  이 코드를 동행자에게 전달하세요.<br />
-                  동행자가 로그인 후 <b className="text-slate-300">MY → 여행 선택 → 초대 코드 입력</b>에 넣으면
-                  같은 여행을 함께 편집합니다. (7일간 유효)
+                  링크를 받은 동행자가 열어서 로그인하면 자동으로 같은 여행에 참여합니다.<br />
+                  (링크가 막히면 코드를 <b className="text-slate-300">MY → 여행 → 초대 코드 입력</b>에 붙여넣어도 돼요 · 7일간 유효)
                 </p>
               </>
             )}
