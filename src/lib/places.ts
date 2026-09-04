@@ -100,7 +100,7 @@ export function usePlaces(): Place[] {
       });
     }
     // 여행지 기본 제공 스팟/맛집 (문서에 없는 이름만 추가 — 중복 방지)
-    const region = regionFor(project?.destination, project?.timezone);
+    const region = regionFor(project?.destination, project?.timezone, project?.name);
     if (region) {
       const known = new Set(out.map((p) => (p.origName || p.name)));
       region.spots.forEach((sp, i) => {
@@ -121,5 +121,5 @@ export function usePlaces(): Place[] {
       });
     }
     return out;
-  }, [spots, restaurants, hotels, dest, project?.timezone]);
+  }, [spots, restaurants, hotels, dest, project?.timezone, project?.name]);
 }

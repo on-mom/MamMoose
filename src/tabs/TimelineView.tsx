@@ -21,6 +21,7 @@ import { pushNotify } from '../lib/push';
 import { firstSentence } from '../lib/notify';
 import { useMemberNames, useMyName } from '../lib/members';
 import { usePlaces } from '../lib/places';
+import { regionFor } from '../data/regions';
 import Modal from '../components/Modal';
 import { PlaceFilterControls, applyPlaceFilter, emptyFilterState, type PlaceFilterState } from '../components/PlaceFilter';
 import CommentThread from '../components/CommentThread';
@@ -62,6 +63,7 @@ export default function TimelineView() {
   const [picker, setPicker] = useState(false);
   const [pickerDay, setPickerDay] = useState(1);
   const [pickFilter, setPickFilter] = useState<PlaceFilterState>(emptyFilterState);
+  const zonesEnabled = regionFor(project.destination, project.timezone, project.name)?.id === 'hanoi';
   const [mode, setMode] = useState<'read' | 'edit'>('read');
   const [detailId, setDetailId] = useState<string | null>(null);
   const [reviewFor, setReviewFor] = useState<TimelineItem | null>(null);
@@ -221,7 +223,7 @@ export default function TimelineView() {
                 </button>
               ))}
             </div>
-            <PlaceFilterControls places={places} state={pickFilter} onChange={setPickFilter} />
+            <PlaceFilterControls places={places} state={pickFilter} onChange={setPickFilter} zonesEnabled={zonesEnabled} />
             <div className="max-h-56 space-y-1 overflow-y-auto">
               {applyPlaceFilter(places, pickFilter).slice(0, 60).map((p) => (
                 <button

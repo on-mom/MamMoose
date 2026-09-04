@@ -49,11 +49,13 @@ export function filterSummary(f: PlaceFilterState): string {
  * 1차 지역(넓은 존 6개, 복수) · 2차 종류(3버튼) · 3차 세부+정렬. 상태는 부모 소유(controlled).
  */
 export function PlaceFilterControls({
-  places, state, onChange,
+  places, state, onChange, zonesEnabled = true,
 }: {
   places: Place[];
   state: PlaceFilterState;
   onChange: (next: PlaceFilterState) => void;
+  /** 지역(존) 필터 노출 — 하노이 등 존 데이터가 있는 여행지만 true */
+  zonesEnabled?: boolean;
 }) {
   const set = (patch: Partial<PlaceFilterState>) => onChange({ ...state, ...patch });
   const byKind = (list: Place[]) => (state.kind === 'all' ? list : list.filter((p) => p.kind === state.kind));
@@ -131,15 +133,19 @@ export function PlaceFilterControls({
     </div>
   );
 
+  const usePrimary = zonesEnabled ? state.primary : 'kind';
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <button
-          onClick={() => set({ primary: state.primary === 'area' ? 'kind' : 'area' })}
-          className="flex items-center gap-1 rounded-md bg-white/5 px-2 py-1 text-[11px] text-slate-300"
-        >
-          <ArrowUpDown size={12} /> {state.primary === 'area' ? '지역 먼저' : '종류 먼저'}
-        </button>
+        {zonesEnabled ? (
+          <button
+            onClick={() => set({ primary: state.primary === 'area' ? 'kind' : 'area' })}
+            className="flex items-center gap-1 rounded-md bg-white/5 px-2 py-1 text-[11px] text-slate-300"
+          >
+            <ArrowUpDown size={12} /> {state.primary === 'area' ? '지역 먼저' : '종류 먼저'}
+          </button>
+        ) : <span />}
         <select
           value={state.sort}
           onChange={(e) => set({ sort: e.target.value as PlaceSort })}
@@ -149,7 +155,7 @@ export function PlaceFilterControls({
         </select>
       </div>
 
-      {state.primary === 'area' ? [ZoneRow, KindRow] : [KindRow, ZoneRow]}
+      {!zonesEnabled ? [KindRow] : usePrimary === 'area' ? [ZoneRow, KindRow] : [KindRow, ZoneRow]}
 
       {catOptions.length > 1 && (
         <div>

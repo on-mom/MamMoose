@@ -6,7 +6,7 @@ import { regionFor } from '../data/regions';
 /** 일정 › 구역 가이드 — 여행지별 구역 소개 + 필수 코스·맛집·카페·쇼핑·분위기. */
 export default function ZoneGuideView() {
   const project = useActiveProject();
-  const region = regionFor(project?.destination, project?.timezone);
+  const region = regionFor(project?.destination, project?.timezone, project?.name);
   const guides = region?.zoneGuide ?? [];
   const [open, setOpen] = useState<string>(guides[0]?.id ?? '');
 

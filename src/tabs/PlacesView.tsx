@@ -20,6 +20,7 @@ import PlaceMap, { type MapPoint } from '../components/PlaceMap';
 import PoiPanel, { PoiFetchButton, useLookupPoi } from '../components/PoiPanel';
 import { accessForArea, fmtVnd } from '../lib/hanoiAccess';
 import HotelTable from '../components/HotelTable';
+import { regionFor } from '../data/regions';
 
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 const tripDays = (s: string, e: string) =>
@@ -55,7 +56,11 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
   const [geo, setGeo] = useState<Record<string, { lat: number; lng: number }>>({});
   const mapRef = useRef<HTMLDivElement>(null);
 
-  const results = useMemo(() => applyPlaceFilter(places, filter), [places, filter]);
+  const zonesEnabled = regionFor(project.destination, project.timezone, project.name)?.id === 'hanoi';
+  const results = useMemo(
+    () => applyPlaceFilter(places, zonesEnabled ? filter : { ...filter, zoneSel: [] }),
+    [places, filter, zonesEnabled],
+  );
   const detail = detailId ? places.find((p) => p.id === detailId) ?? null : null;
   const focusPlace = focusId ? results.find((p) => p.id === focusId) ?? null : null;
 
@@ -313,6 +318,7 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
         <PlaceSearchSheet
           places={places}
           initial={filter}
+          zonesEnabled={zonesEnabled}
           onClose={() => setSheetOpen(false)}
           onApply={(f) => { setFilter(f); setSheetOpen(false); }}
         />
@@ -506,10 +512,11 @@ function AddPlaceForm({ projectId, onDone }: { projectId: string; onDone: () => 
 }
 
 function PlaceSearchSheet({
-  places, initial, onClose, onApply,
+  places, initial, zonesEnabled, onClose, onApply,
 }: {
   places: Place[];
   initial: PlaceFilterState;
+  zonesEnabled: boolean;
   onClose: () => void;
   onApply: (f: PlaceFilterState) => void;
 }) {
@@ -519,9 +526,9 @@ function PlaceSearchSheet({
     <BottomSheet title="장소 검색" onClose={onClose}>
       <div className="space-y-4">
         <p className="text-[11px] text-slate-500">
-          지역·종류 중 하나만 골라도 되고, 둘 다 좁혀도 됩니다. 정하고 아래 [검색하기].
+          {zonesEnabled ? '지역·종류 중 하나만 골라도 되고, 둘 다 좁혀도 됩니다.' : '종류·세부로 좁혀보세요.'} 정하고 아래 [검색하기].
         </p>
-        <PlaceFilterControls places={places} state={draft} onChange={setDraft} />
+        <PlaceFilterControls places={places} state={draft} onChange={setDraft} zonesEnabled={zonesEnabled} />
         <div className="flex gap-2 pt-1">
           <button onClick={() => setDraft(emptyFilterState)} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-slate-300">
             <X size={15} />

@@ -14,7 +14,8 @@ export interface SeedPlace {
 export interface RegionData {
   id: string;
   label: string;
-  match: RegExp;               // (destination + ' ' + timezone).toLowerCase() 에 대해 test
+  match: RegExp;      // 목적지/여행이름 텍스트에 대해 test (도시 식별)
+  tzFallback?: string; // 목적지가 비었거나 매칭 안 될 때만 쓰는 국가 단위 타임존
   zoneGuide: AreaGuide[];
   spots: SeedPlace[];
   restaurants: SeedPlace[];
@@ -24,7 +25,8 @@ export interface RegionData {
 const HANOI: RegionData = {
   id: 'hanoi',
   label: '베트남 하노이',
-  match: /하노이|hanoi|ho_chi_minh|호치민|베트남|vietnam/,
+  match: /하노이|hanoi|호치민|호찌민|다낭|나트랑|호이안|베트남|vietnam|danang|nha ?trang|hoi ?an/i,
+  tzFallback: 'Asia/Ho_Chi_Minh',
   zoneGuide: AREA_GUIDES,
   spots: [
     { name: 'St. Joseph Cathedral', nameKo: '성요셉 성당', category: '랜드마크', area: '올드쿼터', note: '19세기 고딕 성당, 앞 광장 스냅 명소' },
@@ -49,7 +51,7 @@ const HANOI: RegionData = {
 const OSAKA: RegionData = {
   id: 'osaka',
   label: '일본 오사카',
-  match: /오사카|osaka/,
+  match: /오사카|osaka/i,
   zoneGuide: [
     {
       id: 'namba', name: '난바·도톤보리', en: 'Namba / Dotonbori',
@@ -122,7 +124,7 @@ const OSAKA: RegionData = {
 const TOKYO: RegionData = {
   id: 'tokyo',
   label: '일본 도쿄',
-  match: /도쿄|동경|tokyo/,
+  match: /도쿄|동경|tokyo|하코네|요코하마|가마쿠라|hakone|yokohama|kamakura/i,
   zoneGuide: [
     {
       id: 'shibuya', name: '시부야·하라주쿠', en: 'Shibuya / Harajuku',
@@ -195,7 +197,7 @@ const TOKYO: RegionData = {
 const FUKUOKA: RegionData = {
   id: 'fukuoka',
   label: '일본 후쿠오카',
-  match: /후쿠오카|하카타|fukuoka|hakata/,
+  match: /후쿠오카|하카타|기타큐슈|fukuoka|hakata|dazaifu|다자이후/i,
   zoneGuide: [
     {
       id: 'hakata', name: '하카타·나카스', en: 'Hakata / Nakasu',
@@ -250,7 +252,7 @@ const FUKUOKA: RegionData = {
 const BANGKOK: RegionData = {
   id: 'bangkok',
   label: '태국 방콕',
-  match: /방콕|bangkok|태국|thailand/,
+  match: /방콕|bangkok|파타야|아유타야|pattaya|ayutthaya/i,
   zoneGuide: [
     {
       id: 'sukhumvit', name: '수쿰빗', en: 'Sukhumvit',
@@ -321,8 +323,20 @@ const BANGKOK: RegionData = {
 
 export const REGIONS: RegionData[] = [HANOI, OSAKA, TOKYO, FUKUOKA, BANGKOK];
 
-/** 여행지 텍스트/시간대로 매칭되는 지역 데이터 (없으면 null) */
-export function regionFor(destination?: string, timezone?: string): RegionData | null {
-  const hay = `${destination ?? ''} ${timezone ?? ''}`.toLowerCase();
-  return REGIONS.find((r) => r.match.test(hay)) ?? null;
+/**
+ * 여행지 데이터 찾기.
+ * 1순위: 목적지·여행이름 텍스트로 도시 식별 (오사카/도쿄 구분).
+ * 2순위: 목적지가 비었을 때만 국가 단위 타임존 fallback (예: 베트남).
+ */
+export function regionFor(destination?: string, timezone?: string, tripName?: string): RegionData | null {
+  const text = `${destination ?? ''} ${tripName ?? ''}`.trim();
+  if (text) {
+    const hit = REGIONS.find((r) => r.match.test(text));
+    if (hit) return hit;
+  }
+  if (timezone) {
+    const hit = REGIONS.find((r) => r.tzFallback === timezone);
+    if (hit) return hit;
+  }
+  return null;
 }
