@@ -35,6 +35,8 @@ const hasPlaces = () => typeof google !== 'undefined' && !!(google as G).maps?.p
 
 function toInfo(p: google.maps.places.PlaceResult): PoiInfo {
   const loc = p.geometry?.location;
+  let photo: string | undefined;
+  try { photo = p.photos?.[0]?.getUrl({ maxWidth: 800, maxHeight: 480 }) || undefined; } catch { /* noop */ }
   return {
     address: p.formatted_address || undefined,
     hours: p.opening_hours?.weekday_text?.length ? p.opening_hours.weekday_text : undefined,
@@ -44,6 +46,7 @@ function toInfo(p: google.maps.places.PlaceResult): PoiInfo {
     phone: p.formatted_phone_number || p.international_phone_number || undefined,
     website: p.website || undefined,
     mapUrl: p.url || undefined,
+    photo,
     lat: loc?.lat(),
     lng: loc?.lng(),
     fetchedAt: Date.now(),
@@ -52,7 +55,7 @@ function toInfo(p: google.maps.places.PlaceResult): PoiInfo {
 
 const FIELDS = [
   'name', 'formatted_address', 'opening_hours', 'rating', 'user_ratings_total',
-  'formatted_phone_number', 'international_phone_number', 'website', 'url', 'geometry',
+  'formatted_phone_number', 'international_phone_number', 'website', 'url', 'geometry', 'photos',
 ];
 
 /** 장소 정보 조회. 실패/미지원이면 null. */

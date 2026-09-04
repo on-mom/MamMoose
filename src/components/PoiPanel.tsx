@@ -38,7 +38,11 @@ export default function PoiPanel({ poi, onRefresh }: { poi?: PoiInfo; onRefresh?
   const todayIdx = (new Date().getDay() + 6) % 7; // weekday_text 는 월요일 시작
 
   return (
-    <div className="space-y-2 rounded-xl bg-white/[0.04] p-3 text-[12px]">
+    <div className="overflow-hidden rounded-xl bg-white/[0.04] text-[12px]">
+      {poi.photo && (
+        <img src={poi.photo} alt="" loading="lazy" className="h-36 w-full object-cover" />
+      )}
+      <div className="space-y-2 p-3">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold text-moose-heart">🗺️ 구글 지도 정보</span>
         {onRefresh && (
@@ -81,6 +85,7 @@ export default function PoiPanel({ poi, onRefresh }: { poi?: PoiInfo; onRefresh?
       )}
       <div className="text-[9px] text-slate-600">
         {new Date(poi.fetchedAt).toLocaleDateString('ko-KR')} 기준 · 방문 전 최신 정보 확인 권장
+      </div>
       </div>
     </div>
   );

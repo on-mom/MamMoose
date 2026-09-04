@@ -8,8 +8,8 @@ export interface AreaGuide {
   name: string;
   en: string;
   intro: string;
-  photo: string;   // 대표 랜드마크 사진 (public/zones)
-  credit: string;  // 사진 출처
+  photo?: string;   // 대표 랜드마크 사진 (public/zones) — 있으면 배너
+  credit?: string;  // 사진 출처
   mustSee: GuideItem[];
   food: GuideItem[];
   cafe: GuideItem;

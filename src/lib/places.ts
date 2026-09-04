@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { EntryComment, Hotel, PoiInfo } from '../types';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, useActiveProject } from '../store/useAppStore';
+import { regionFor } from '../data/regions';
 
 /**
  * 통합 "장소" 뷰 모델 — 관광지(spots) · 맛집(restaurants) · 숙소(hotels)를
@@ -60,18 +61,24 @@ const won = (t: string) =>
 export const splitAreas = (area: string) =>
   area.split(/[/·,、|]|\s-\s/).map((a) => a.trim()).filter(Boolean);
 
+/** true = 여행지 기본 제공 데이터 (문서에 저장 안 됨, 편집 불가) */
+export const isSeedPlace = (id: string) => id.startsWith('region:');
+
 export function usePlaces(): Place[] {
   const spots = useAppStore((s) => s.present[s.activeProjectId]?.spots ?? []);
   const restaurants = useAppStore((s) => s.present[s.activeProjectId]?.restaurants ?? []);
   const hotels = useAppStore((s) => s.present[s.activeProjectId]?.hotels ?? []);
+  const project = useActiveProject();
+  const dest = project?.destination || '';
 
   return useMemo(() => {
+    const q = (name: string) => `https://maps.google.com/?q=${encodeURIComponent(`${name} ${dest}`.trim())}`;
     const out: Place[] = [];
     for (const sp of spots) {
       out.push({
         id: sp.id, kind: 'landmark', name: sp.name, area: sp.area,
         category: sp.category || '관광지', note: sp.tip, comments: sp.comments, poi: sp.poi,
-        mapUrl: `https://maps.google.com/?q=${encodeURIComponent(sp.name + ' Hanoi')}`,
+        mapUrl: q(sp.name),
       });
     }
     for (const r of restaurants) {
@@ -87,11 +94,32 @@ export function usePlaces(): Place[] {
         id: h.id, kind: 'stay', name: h.name, area: hotelArea(h),
         category: h.grade || '숙소', priceText: h.priceTotalText || undefined,
         priceValue: won(h.priceTotalText), rating: h.rating, note: h.feature,
-        mapUrl: `https://maps.google.com/?q=${encodeURIComponent(h.name + ' Hanoi')}`,
+        mapUrl: q(h.name),
         comments: h.comments, poi: h.poi,
         breakfast: h.breakfast || undefined, nearby: h.nearby || undefined, grade: h.grade || undefined,
       });
     }
+    // 여행지 기본 제공 스팟/맛집 (문서에 없는 이름만 추가 — 중복 방지)
+    const region = regionFor(project?.destination, project?.timezone);
+    if (region) {
+      const known = new Set(out.map((p) => (p.origName || p.name)));
+      region.spots.forEach((sp, i) => {
+        if (known.has(sp.name) || known.has(sp.nameKo ?? '')) return;
+        out.push({
+          id: `region:${region.id}:s${i}`, kind: 'landmark', name: sp.nameKo || sp.name,
+          origName: sp.name, area: sp.area, category: sp.category || '관광지', note: sp.note,
+          mapUrl: q(sp.name),
+        });
+      });
+      region.restaurants.forEach((r, i) => {
+        if (known.has(r.name) || known.has(r.nameKo ?? '')) return;
+        out.push({
+          id: `region:${region.id}:r${i}`, kind: 'food', name: r.nameKo || r.name,
+          origName: r.name, area: r.area, category: r.category || '맛집', note: r.note, menu: r.menu,
+          mapUrl: q(r.name),
+        });
+      });
+    }
     return out;
-  }, [spots, restaurants, hotels]);
+  }, [spots, restaurants, hotels, dest, project?.timezone]);
 }

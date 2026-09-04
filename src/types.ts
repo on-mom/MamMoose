@@ -119,6 +119,8 @@ export interface PoiInfo {
   phone?: string;
   website?: string;
   mapUrl?: string;
+  /** 대표 사진 URL (구글 Places) */
+  photo?: string;
   lat?: number;
   lng?: number;
   fetchedAt: number;
