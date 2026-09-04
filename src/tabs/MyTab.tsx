@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Check, LogOut, Plus, Send, Camera, Image as ImageIcon, UserPlus, Copy, AlertTriangle,
-  MoreVertical, Pencil, Trash2, Loader2, ChevronRight, ChevronLeft,
+  MoreVertical, Pencil, Trash2, Loader2, ChevronRight, ChevronLeft, Download,
 } from 'lucide-react';
 import type { Project, Person } from '../types';
 import { useAppStore, useActiveProject, type CloudUser } from '../store/useAppStore';
 import { uid } from '../lib/uid';
+import { precacheShell } from '../lib/online';
 import { cloudEnabled, signOut } from '../lib/supabase';
 import { createInvite, acceptInvite, createCloudTrip, deleteCloudTrip, ejectMember, deleteMyAccount } from '../store/cloudSync';
 import { useMyName } from '../lib/members';
@@ -551,6 +552,8 @@ function Trips() {
           <Plus size={14} /> 여행 프로젝트 추가
         </button>
       )}
+      <OfflineCard tripId={activeId} />
+
       <p className="pt-1 text-center text-[10px] text-slate-600">여행을 선택하면 일정·맛집·Todo·가계부가 해당 여행 데이터로 전환됩니다</p>
 
       {delTarget && (
@@ -609,6 +612,48 @@ function Trips() {
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+/* ---------- 오프라인 저장 ---------- */
+function relTime(ts: number): string {
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1) return '방금';
+  if (m < 60) return `${m}분 전`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}시간 전`;
+  return `${Math.floor(h / 24)}일 전`;
+}
+function OfflineCard({ tripId }: { tripId: string }) {
+  const KEY = `mammoose-offline-${tripId}`;
+  const [savedAt, setSavedAt] = useState<number | null>(() => {
+    try { return Number(localStorage.getItem(KEY)) || null; } catch { return null; }
+  });
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await precacheShell();
+      const now = Date.now();
+      try { localStorage.setItem(KEY, String(now)); } catch { /* quota */ }
+      setSavedAt(now);
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="space-y-1.5 card border-0 p-3 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 font-semibold text-white"><Download size={13} /> 오프라인 저장</span>
+        <button onClick={save} disabled={busy} className="btn-heart rounded-lg px-3 py-1 font-semibold disabled:opacity-50">
+          {busy ? '저장 중…' : savedAt ? '다시 저장' : '지금 저장'}
+        </button>
+      </div>
+      <p className="text-[11px] leading-relaxed text-slate-500">
+        {savedAt && <span className="text-emerald-400">✓ {relTime(savedAt)} 저장됨 · </span>}
+        일정·맛집·Todo·가계부·채팅 글은 인터넷 없이도 이 기기에서 보여요. (사진·지도는 연결됐을 때 불러옵니다)
+      </p>
     </div>
   );
 }

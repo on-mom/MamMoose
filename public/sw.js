@@ -1,7 +1,7 @@
 // 맘무스 서비스 워커 — 오프라인 대비 (현지 인터넷 불안정 대응)
 // HTML(내비게이션) = network-first: 배포 즉시 최신 반영. 해시된 정적 자산 = cache-first(불변).
 // 그 외 same-origin = stale-while-revalidate. 외부 도메인은 건드리지 않음.
-const CACHE = 'mammoose-v2';
+const CACHE = 'mammoose-v3';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
@@ -59,6 +59,21 @@ self.addEventListener('fetch', (e) => {
         })
         .catch(() => cached || caches.match('/'));
       return cached || network;
+    }),
+  );
+});
+
+// ---------- "지금 저장" — 앱 셸을 캐시에 강제로 채움 ----------
+self.addEventListener('message', (e) => {
+  const d = e.data || {};
+  if (d.type !== 'precache' || !Array.isArray(d.urls)) return;
+  e.waitUntil(
+    caches.open(CACHE).then((c) => Promise.all(
+      d.urls.map((u) => fetch(u, { cache: 'reload' })
+        .then((r) => (r && r.ok ? c.put(u, r.clone()) : null))
+        .catch(() => {})),
+    )).then(() => {
+      if (e.source) e.source.postMessage({ type: 'precache-done' });
     }),
   );
 });

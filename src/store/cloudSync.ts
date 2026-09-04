@@ -119,8 +119,25 @@ function startPushWatcher() {
     const metaChanged = s.projects.find((p) => p.id === id) !== prev.projects.find((p) => p.id === id);
     if (!docChanged && !metaChanged) return;
     clearTimeout(pushTimer);
-    pushTimer = setTimeout(() => pushTrip(id), 800);
+    pushTimer = setTimeout(() => pushTrip(id), 350); // 구글시트 같은 즉시성: 짧게
   });
+}
+
+/** realtime UPDATE 페이로드에 실려온 새 문서를 바로 반영 (refetch 왕복 생략 → 상대 변경이 ~0.3초 안에 보임) */
+function applyRemoteRow(id: string, remote: TripDoc, meta?: Omit<Project, 'id'>) {
+  const st = useAppStore.getState();
+  const local = st.present[id];
+  const base = baseDocs[id];
+  const merged: TripDoc = base && local && docDiffers(local, base)
+    ? (mergeDoc(base, local, remote) as TripDoc)
+    : remote;
+  baseDocs[id] = merged;
+  applyingRemote = true;
+  st.patchDoc(id, merged);
+  if (meta && typeof meta === 'object') st.patchProject(id, meta);
+  applyingRemote = false;
+  notifyNewComments({ [id]: merged }, st.cloudUser?.name ?? '', !!st.settings.notifyMemories);
+  if (docDiffers(merged, remote)) { clearTimeout(pushTimer); pushTimer = setTimeout(() => pushTrip(id), 300); }
 }
 
 async function pushTrip(id: string) {
@@ -163,9 +180,15 @@ function startRealtime(tripIds: string[]) {
 
   const onChange = (payload: { eventType?: string; new: unknown }) => {
     const me = useAppStore.getState().cloudUser?.id;
-    const by = (payload.new as { updated_by?: string } | null)?.updated_by;
-    if (payload.eventType === 'UPDATE' && by && by === me) return; // 내 변경 에코 무시
-    fetchTrips();
+    const row = payload.new as
+      { id?: string; doc?: TripDoc; meta?: Omit<Project, 'id'>; updated_by?: string } | null;
+    if (payload.eventType === 'UPDATE' && row?.updated_by && row.updated_by === me) return; // 내 변경 에코 무시
+    // 페이로드에 새 문서가 실려 있으면 바로 반영, 아니면(INSERT/DELETE·용량초과) 전체 재조회
+    if (payload.eventType === 'UPDATE' && row?.id && row.doc && typeof row.doc === 'object') {
+      applyRemoteRow(row.id, sanitizeDoc(row.doc), row.meta);
+    } else {
+      fetchTrips();
+    }
   };
   let ch = supabase.channel('trips-sync');
   // postgres_changes 필터는 절당 값 1개 → id 마다 절을 추가

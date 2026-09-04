@@ -1,6 +1,7 @@
-import { Undo2, Redo2, Lock } from 'lucide-react';
+import { Undo2, Redo2, Lock, CloudOff } from 'lucide-react';
 import { useAppStore, useActiveProject, useCanUndo, useCanRedo } from '../store/useAppStore';
 import { useRegisterMe } from '../lib/members';
+import { useOnline } from '../lib/online';
 import { TAB_VIEWS } from '../tabs';
 import { Moose } from './Moose';
 import ErrorBoundary from './ErrorBoundary';
@@ -24,6 +25,7 @@ export default function Layout() {
   const { undo, redo, lock } = useAppStore.getState();
   const canUndo = useCanUndo();
   const canRedo = useCanRedo();
+  const online = useOnline();
   useRegisterMe(); // 앱을 켠 사람은 이 여행 참여자로 등록 (조용히 보는 상황 방지)
 
   const View = TAB_VIEWS[activeTab];
@@ -54,6 +56,11 @@ export default function Layout() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {!online && (
+            <span className="mr-0.5 flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+              <CloudOff size={11} /> 오프라인
+            </span>
+          )}
           <button
             onClick={undo}
             disabled={!canUndo}
