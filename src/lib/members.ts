@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { staleSelfKeys } from './selfKeys';
 
 /** 현재 사용자 표시 이름 — 앱에서 바꾼 프로필명이 우선(카톡 기본 닉네임보다). */
 export function useMyName(): string {
@@ -50,27 +51,26 @@ export function useRegisterMe() {
   const cloudUser = useAppStore((s) => s.cloudUser);
   const mutate = useAppStore((s) => s.mutate);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevMe = useRef(me);
 
   useEffect(() => {
     if (!projectId) return;
     // 프로필명 입력 중 매 글자마다 people 이 오염되지 않도록 1초 디바운스
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
+      const was = prevMe.current;
       const uidWant = cloudUser?.id ?? null;
       const wantAvatar = profile.avatarDataUrl || cloudUser?.avatar || null;
       const cur = useAppStore.getState().present[projectId]?.people ?? {};
 
-      // 삭제 대상: 내 옛 이름 스냅샷 전부
-      //  - userId 가 나와 같은 키 (로그인 상태 — 입력 중 생긴 중간 이름 포함)
-      //  - 알려진 옛 이름(로그인 기본닉·직전 displayName·'나')
-      const staleKeys = Object.keys(cur).filter((k) => {
-        if (k === me) return false;
-        if (uidWant && (cur[k] as { userId?: string })?.userId === uidWant) return true;
-        return k === cloudUser?.name || k === profile.displayName || k === '나';
+      // 삭제 대상: 내 옛 이름 스냅샷 전부 (입력 중 생긴 중간 이름 · 직전 이름 포함)
+      const staleKeys = staleSelfKeys(cur, {
+        me, was, uid: uidWant, cloudName: cloudUser?.name, displayName: profile.displayName,
       });
 
       const fresh = cur[me]?.name === me && cur[me]?.avatar === wantAvatar
         && (cur[me] as { userId?: string })?.userId === (uidWant ?? undefined);
+      prevMe.current = me;
       if (fresh && !staleKeys.length) return;
 
       mutate((doc) => {
