@@ -198,6 +198,30 @@ export async function ejectMember(tripId: string, userId: string): Promise<{ ok:
   return { ok: true };
 }
 
+/** 회원 탈퇴 — 내 클라우드 데이터(여행·멤버십·푸시구독)를 영구 삭제하고 로그아웃. */
+export async function deleteMyAccount(): Promise<{ ok: boolean; error?: string }> {
+  if (!supabase) return { ok: false, error: '클라우드에 연결돼 있지 않아요' };
+  const { data: u } = await supabase.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) return { ok: false, error: '로그인 상태가 아니에요' };
+
+  teardown();
+  // 내가 만든 여행 전부 삭제 (trip_members·invites·doc 은 FK cascade)
+  const { error: e1 } = await supabase.from('trips').delete().eq('owner', uid);
+  if (e1) return { ok: false, error: '여행 삭제 실패: ' + e1.message };
+  // 남의 여행에 참여했던 멤버십 · 푸시 구독 정리 (실패해도 계속)
+  try { await supabase.from('trip_members').delete().eq('user_id', uid); } catch { /* noop */ }
+  try { await supabase.from('push_subscriptions').delete().eq('user_id', uid); } catch { /* noop */ }
+
+  await supabase.auth.signOut();
+  try {
+    Object.keys(localStorage).filter((k) => k.startsWith('mammoose-')).forEach((k) => localStorage.removeItem(k));
+  } catch { /* noop */ }
+  useAppStore.getState().resetLocal();
+  useAppStore.setState({ unlocked: false, cloudError: null });
+  return { ok: true };
+}
+
 export async function deleteCloudTrip(tripId: string) {
   if (!supabase || !isCloudId(tripId)) return;
   const { error } = await supabase.from('trips').delete().eq('id', tripId);

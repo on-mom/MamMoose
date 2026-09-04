@@ -7,7 +7,7 @@ import type { Project, Person } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { cloudEnabled, signOut } from '../lib/supabase';
-import { createInvite, acceptInvite, deleteCloudTrip, ejectMember } from '../store/cloudSync';
+import { createInvite, acceptInvite, deleteCloudTrip, ejectMember, deleteMyAccount } from '../store/cloudSync';
 import { useMyName } from '../lib/members';
 import { Moose } from '../components/Moose';
 import CoupleMoose from '../components/CoupleMoose';
@@ -805,6 +805,15 @@ function Settings() {
   const [cur, setCur] = useState('');
   const [next, setNext] = useState('');
   const [msg, setMsg] = useState('');
+  const [wipe, setWipe] = useState<null | 'ask' | 'busy'>(null);
+  const [wipeAgree, setWipeAgree] = useState(false);
+
+  const doWipe = async () => {
+    setWipe('busy');
+    const r = await deleteMyAccount();
+    if (!r.ok) { setWipe('ask'); alert('탈퇴 처리 실패: ' + (r.error ?? '알 수 없음')); return; }
+    location.reload();
+  };
 
   const toggleNotify = async () => {
     if (settings.notifyMemories) {
@@ -839,6 +848,12 @@ function Settings() {
           </div>
           <button onClick={signOut} className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700 py-2 text-slate-300">
             <LogOut size={14} /> 로그아웃
+          </button>
+          <button
+            onClick={() => { setWipeAgree(false); setWipe('ask'); }}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-rose-500/40 py-2 text-[13px] text-rose-400"
+          >
+            <Trash2 size={13} /> 회원 탈퇴 (모든 데이터 삭제)
           </button>
         </section>
       ) : (
@@ -887,6 +902,39 @@ function Settings() {
       <p className="text-center text-[10px] text-slate-600">
         맘무스 v0.4 · {cloudEnabled ? '클라우드 연결됨' : '로컬 모드'}
       </p>
+
+      {wipe && (
+        <Modal
+          onClose={() => wipe !== 'busy' && setWipe(null)}
+          title={<span className="text-sm font-bold text-rose-400">회원 탈퇴</span>}
+          footer={
+            <div className="flex gap-2">
+              <button onClick={() => setWipe(null)} disabled={wipe === 'busy'} className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm text-slate-300">
+                취소
+              </button>
+              <button
+                onClick={doWipe}
+                disabled={!wipeAgree || wipe === 'busy'}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                {wipe === 'busy' ? <Loader2 size={15} className="animate-spin" /> : '삭제하겠습니다'}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-[13px] text-slate-200">
+            <p>
+              내가 만든 <b className="text-white">모든 여행</b>과 그 안의 일정·탐색·Todo·가계부·채팅·사진·일기가
+              클라우드에서 <b className="text-rose-300">영구 삭제</b>되며 <b className="text-rose-300">복구할 수 없습니다.</b>
+            </p>
+            <p className="text-[12px] text-slate-400">동행자와 공유 중인 여행이 있다면, 그 여행도 함께 사라집니다.</p>
+            <label className="flex items-start gap-2 rounded-lg bg-white/[0.04] p-2.5">
+              <input type="checkbox" checked={wipeAgree} onChange={(e) => setWipeAgree(e.target.checked)} className="mt-0.5 accent-rose-500" />
+              <span>위 내용을 이해했으며, 데이터가 삭제되어 복구할 수 없음에 동의합니다.</span>
+            </label>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

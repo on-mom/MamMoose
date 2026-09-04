@@ -1,10 +1,11 @@
 // 맘무스 서비스 워커 — 오프라인 대비 (현지 인터넷 불안정 대응)
-// 전략: same-origin GET 은 stale-while-revalidate. 외부(구글맵·오픈메테오·Supabase)는 항상 네트워크.
-const CACHE = 'mammoose-v1';
+// HTML(내비게이션) = network-first: 배포 즉시 최신 반영. 해시된 정적 자산 = cache-first(불변).
+// 그 외 same-origin = stale-while-revalidate. 외부 도메인은 건드리지 않음.
+const CACHE = 'mammoose-v2';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/index.html', '/manifest.webmanifest', '/moose-face.png', '/moose-full.png'])).catch(() => {}));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/manifest.webmanifest', '/moose-face.png', '/moose-full.png'])).catch(() => {}));
 });
 
 self.addEventListener('activate', (e) => {
@@ -19,16 +20,41 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return; // 외부 도메인은 SW가 건드리지 않음
+  if (url.origin !== self.location.origin) return;
 
+  const isNav = req.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html');
+  const isHashedAsset = /\/assets\/.+\.[0-9a-f]{8,}\.(js|css|woff2?|png|jpg|svg)$/i.test(url.pathname);
+
+  if (isNav) {
+    // network-first — 새 배포를 바로 받음
+    e.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.ok) caches.open(CACHE).then((c) => c.put('/', res.clone()));
+          return res;
+        })
+        .catch(() => caches.match(req).then((c) => c || caches.match('/'))),
+    );
+    return;
+  }
+
+  if (isHashedAsset) {
+    // cache-first — 해시가 바뀌면 자동으로 새 파일
+    e.respondWith(
+      caches.match(req).then((cached) => cached || fetch(req).then((res) => {
+        if (res && res.ok) caches.open(CACHE).then((c) => c.put(req, res.clone()));
+        return res;
+      })),
+    );
+    return;
+  }
+
+  // 기타 — stale-while-revalidate
   e.respondWith(
     caches.match(req).then((cached) => {
       const network = fetch(req)
         .then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
-          }
+          if (res && res.ok) caches.open(CACHE).then((c) => c.put(req, res.clone()));
           return res;
         })
         .catch(() => cached || caches.match('/'));
