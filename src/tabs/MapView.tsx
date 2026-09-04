@@ -73,20 +73,35 @@ export default function MapView() {
     return () => { alive = false; };
   }, [hotels]);
 
-  const anchor = hotelPt ?? (placed[0] ? { lat: placed[0].lat, lng: placed[0].lng, name: placed[0].place } : null);
+  // 숙소가 기준점 (지오코딩 성공 시). 숙소 위치가 없으면 첫 장소를 '출발점'으로 고정하고 나머지를 정렬.
+  const firstMovable = useMemo(
+    () => dayItems.find((i) => !i.flightLeg && i.lat != null && i.lng != null) ?? null,
+    [dayItems],
+  );
+  const anchor = hotelPt
+    ? { lat: hotelPt.lat, lng: hotelPt.lng, label: `숙소 ${hotelPt.name}` }
+    : firstMovable
+      ? { lat: firstMovable.lat!, lng: firstMovable.lng!, label: `출발점 ${firstMovable.place}` }
+      : null;
 
   const sortRoute = (mode: 'near' | 'far' | 'reverse') => {
     if (dayItems.length < 2 || (mode !== 'reverse' && !anchor)) return;
     const outbound = dayItems.filter((i) => i.flightLeg === 'outbound');
     const inbound = dayItems.filter((i) => i.flightLeg === 'inbound');
-    const movable = dayItems.filter((i) => !i.flightLeg);
+    let movable = dayItems.filter((i) => !i.flightLeg);
+
+    // 숙소 위치가 없어 첫 장소를 기준으로 쓰면, 그 장소는 맨 앞에 고정하고 나머지만 정렬
+    const pinId = !hotelPt && firstMovable ? firstMovable.id : null;
+    const pinned = pinId ? movable.filter((i) => i.id === pinId) : [];
+    movable = pinId ? movable.filter((i) => i.id !== pinId) : movable;
+
     let ordered: TimelineItem[];
     if (mode === 'reverse') {
-      ordered = [...movable].reverse();
+      ordered = [...pinned, ...movable].reverse();
     } else {
       const d2 = (i: TimelineItem) =>
         i.lat == null || i.lng == null ? Infinity : (i.lat - anchor!.lat) ** 2 + (i.lng - anchor!.lng) ** 2;
-      ordered = [...movable].sort((a, b) => (mode === 'near' ? d2(a) - d2(b) : d2(b) - d2(a)));
+      ordered = [...pinned, ...[...movable].sort((a, b) => (mode === 'near' ? d2(a) - d2(b) : d2(b) - d2(a)))];
     }
     const final = [...outbound, ...ordered, ...inbound];
     mutate((doc) => {
@@ -157,11 +172,9 @@ export default function MapView() {
             onClick={() => sortRoute('reverse')}
             className="rounded-md bg-white/5 px-2 py-1 text-slate-200"
           >↕ 뒤집기</button>
-          {anchor && (
-            <span className="w-full text-[10px] text-slate-500">
-              기준: {hotelPt ? `숙소 ${hotelPt.name}` : `첫 장소 ${anchor.name}`}
-            </span>
-          )}
+          {anchor
+            ? <span className="w-full text-[10px] text-slate-500">기준: {anchor.label}</span>
+            : <span className="w-full text-[10px] text-slate-500">장소에 핀을 찍으면 거리순으로 정렬할 수 있어요</span>}
         </div>
       )}
 

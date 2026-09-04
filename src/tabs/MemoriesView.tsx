@@ -4,6 +4,7 @@ import { useActiveProject } from '../store/useAppStore';
 import { MooseEmpty } from '../components/Moose';
 import CoupleMoose from '../components/CoupleMoose';
 import TripSummary from './TripSummary';
+import BudgetSummary from './BudgetSummary';
 import { useMemoryPicks } from '../lib/memories';
 
 export { useMemoryPicks, tripEnded } from '../lib/memories';
@@ -18,7 +19,7 @@ const dayLabel = (start: string, day: number) => {
 export default function MemoriesView() {
   const project = useActiveProject()!;
   const picks = useMemoryPicks();
-  const [tab, setTab] = useState<'list' | 'card'>('list');
+  const [tab, setTab] = useState<'list' | 'card' | 'budget'>('list');
 
   return (
     <div className="space-y-3 overflow-y-auto pb-2">
@@ -29,8 +30,8 @@ export default function MemoriesView() {
         <div className="text-[11px] text-slate-400">둘 다 ♥ 누른 곳 {picks.length}곳</div>
       </div>
 
-      <div className="flex gap-1 rounded-lg bg-moose-edge p-1 text-xs">
-        {([['list', '좋아한 곳'], ['card', '여행 요약 카드']] as const).map(([k, l]) => (
+      <div className="flex gap-1 rounded-lg bg-moose-edge p-1 text-[11px]">
+        {([['list', '좋아한 곳'], ['card', '추억 카드'], ['budget', '가계부 카드']] as const).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)}
             className={`flex-1 rounded-md py-1.5 ${tab === k ? 'bg-moose-heart text-white' : 'text-slate-400'}`}>
             {l}
@@ -39,6 +40,7 @@ export default function MemoriesView() {
       </div>
 
       {tab === 'card' && <TripSummary />}
+      {tab === 'budget' && <BudgetSummary />}
 
       {tab === 'list' && picks.length === 0 && (
         <MooseEmpty

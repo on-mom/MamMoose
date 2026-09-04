@@ -1,9 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
-import { useAppStore, useActiveProject } from '../store/useAppStore';
-import { toKrw, commas, cachedRate, fallbackRate } from '../lib/currency';
-import { currencyOf } from '../lib/cities';
+import { useActiveProject, useAppStore } from '../store/useAppStore';
 import { useMemoryPicks } from '../lib/memories';
+import { saveNodeAsPng } from '../lib/saveImage';
 import CoupleMoose from '../components/CoupleMoose';
 
 const tripDays = (s: string, e: string) =>
@@ -13,50 +12,30 @@ const tripDays = (s: string, e: string) =>
 export default function TripSummary() {
   const project = useActiveProject()!;
   const doc = useAppStore((s) => s.present[s.activeProjectId]);
-  const settings = useAppStore((s) => s.settings);
   const picks = useMemoryPicks();
   const cardRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
 
-  const local = currencyOf(project.timezone, project.destination);
-  const useFixed = settings.rateMode === 'fixed' && local === 'VND';
-  const rate = local === 'KRW' ? 1
-    : useFixed ? (Number(settings.fixedVndToKrw) || fallbackRate('VND'))
-    : (cachedRate(local) || fallbackRate(local));
-
   const stats = useMemo(() => {
     const t = doc?.timeline ?? [];
     const visited = t.filter((i) => i.place && i.place !== '새 일정' && !/출국|귀국/.test(i.place)).length;
-    const spentKrw = (doc?.expenses ?? []).reduce((s, e) => s + Number(toKrw(e.amountVnd || '0', rate)), 0);
     const photos = t.reduce((n, i) => n + (i.photos?.length ?? 0), 0)
       + (doc?.diary ?? []).reduce((n, d) => n + (d.photos?.length ?? 0), 0);
     return {
       days: tripDays(project.startDate, project.endDate),
       visited,
-      spentKrw: Math.round(spentKrw),
+      restaurants: (doc?.restaurants ?? []).length,
       liked: picks.length,
       diary: (doc?.diary ?? []).length,
       photos,
     };
-  }, [doc, project, rate, picks.length]);
+  }, [doc, project, picks.length]);
 
   const save = async () => {
     if (!cardRef.current) return;
     setSaving(true);
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(cardRef.current, { backgroundColor: '#131019', scale: 2, logging: false });
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `${project.name} 요약.png`;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-      }, 'image/png');
-    } finally {
-      setSaving(false);
-    }
+    try { await saveNodeAsPng(cardRef.current, `${project.name} 추억.png`); }
+    finally { setSaving(false); }
   };
 
   const Stat = ({ n, l }: { n: string | number; l: string }) => (
@@ -83,7 +62,7 @@ export default function TripSummary() {
         <div className="grid grid-cols-3 gap-1.5 p-4">
           <Stat n={`${stats.days}일`} l="여행 기간" />
           <Stat n={`${stats.visited}곳`} l="다녀온 곳" />
-          <Stat n={stats.spentKrw > 0 ? `${commas(stats.spentKrw)}` : '-'} l="총 지출(원)" />
+          <Stat n={`${stats.restaurants}곳`} l="찾아간 맛집" />
           <Stat n={`${stats.liked}곳`} l="둘 다 좋아한 곳" />
           <Stat n={`${stats.diary}개`} l="한 줄 일기" />
           <Stat n={`${stats.photos}장`} l="추억 사진" />
