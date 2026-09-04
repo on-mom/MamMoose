@@ -273,18 +273,20 @@ export const useAppStore = create<AppState>()(
           }
         }
         if (from < 10) {
-          // 예시(샘플) 여행 제거 — 로컬에 남아있던 sample-*/hanoi-2026-09 프로젝트 삭제
-          const isSample = (id: string) => id.startsWith('sample-') || id === 'hanoi-2026-09';
-          persisted.projects = (persisted?.projects ?? []).filter((p: any) => !isSample(p.id));
-          for (const k of Object.keys(persisted?.present ?? {})) {
-            if (isSample(k)) delete persisted.present[k];
-          }
+          // 예시(샘플) 여행 제거. sample-* 는 무조건 throwaway.
+          // hanoi-2026-09(구버전 시드 id)는 사용자가 채운 흔적(메시지/일기/사진)이 없을 때만 삭제.
+          const present: Record<string, any> = persisted?.present ?? {};
+          const touched = (d: any) => !!(d && (d.messages?.length || d.diary?.length
+            || d.timeline?.some((t: any) => t.photos?.length || t.likes?.length || t.comments?.length)));
+          const drop = (id: string) => id.startsWith('sample-') || (id === 'hanoi-2026-09' && !touched(present[id]));
+          persisted.projects = (persisted?.projects ?? []).filter((p: any) => !drop(p.id));
+          for (const k of Object.keys(present)) if (drop(k)) delete present[k];
           if (!persisted.projects.length) {
             const fresh = blankProject();
             persisted.projects = [fresh];
-            persisted.present = { ...persisted.present, [fresh.id]: emptyDoc() };
+            persisted.present = { ...present, [fresh.id]: emptyDoc() };
             persisted.activeProjectId = fresh.id;
-          } else if (isSample(persisted.activeProjectId ?? '')) {
+          } else if (!persisted.projects.some((p: any) => p.id === persisted.activeProjectId)) {
             persisted.activeProjectId = persisted.projects[0].id;
           }
         }
