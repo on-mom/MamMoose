@@ -247,7 +247,9 @@ export async function ejectMember(tripId: string, userId: string): Promise<{ ok:
   return { ok: true };
 }
 
-/** 회원 탈퇴 — 내 클라우드 데이터(여행·멤버십·푸시구독)를 영구 삭제하고 로그아웃. */
+/** 회원 탈퇴 — 여행·멤버십·푸시구독은 물론 인증 계정(auth.users)까지 지우고 로그아웃.
+ *  1순위: delete-account Edge Function(서비스 롤 → 계정 완전 삭제).
+ *  함수 미배포/실패 시: 클라이언트에서 지울 수 있는 데이터만 정리 (계정 행은 남음). */
 export async function deleteMyAccount(): Promise<{ ok: boolean; error?: string }> {
   if (!supabase) return { ok: false, error: '클라우드에 연결돼 있지 않아요' };
   const { data: u } = await supabase.auth.getUser();
@@ -255,12 +257,20 @@ export async function deleteMyAccount(): Promise<{ ok: boolean; error?: string }
   if (!uid) return { ok: false, error: '로그인 상태가 아니에요' };
 
   teardown();
-  // 내가 만든 여행 전부 삭제 (trip_members·invites·doc 은 FK cascade)
-  const { error: e1 } = await supabase.from('trips').delete().eq('owner', uid);
-  if (e1) return { ok: false, error: '여행 삭제 실패: ' + e1.message };
-  // 남의 여행에 참여했던 멤버십 · 푸시 구독 정리 (실패해도 계속)
-  try { await supabase.from('trip_members').delete().eq('user_id', uid); } catch { /* noop */ }
-  try { await supabase.from('push_subscriptions').delete().eq('user_id', uid); } catch { /* noop */ }
+
+  let fullyDeleted = false;
+  try {
+    const { data, error } = await supabase.functions.invoke('delete-account');
+    if (!error && (data as { ok?: boolean })?.ok) fullyDeleted = true;
+  } catch { /* 함수 미배포 → 아래 폴백 */ }
+
+  if (!fullyDeleted) {
+    // 폴백: 계정 행은 못 지우지만 내 데이터는 정리
+    const { error: e1 } = await supabase.from('trips').delete().eq('owner', uid);
+    if (e1) return { ok: false, error: '여행 삭제 실패: ' + e1.message };
+    try { await supabase.from('trip_members').delete().eq('user_id', uid); } catch { /* noop */ }
+    try { await supabase.from('push_subscriptions').delete().eq('user_id', uid); } catch { /* noop */ }
+  }
 
   await supabase.auth.signOut();
   try {
