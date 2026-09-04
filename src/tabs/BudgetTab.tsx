@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, ArrowRight } from 'lucide-react';
 import type { Expense, ExpenseCategory } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
+import { useMemberNames, useMyName } from '../lib/members';
+import { settle } from '../lib/settle';
 import { toKrw, commas, cachedRate, fetchRate, fallbackRate } from '../lib/currency';
 import { currencyOf, currencyMeta } from '../lib/cities';
 import { useDebounced } from '../lib/useDebounced';
@@ -58,6 +60,18 @@ export default function BudgetTab() {
   const commitBudget = useDebounced((v: number) => patchProject(project.id, { budgetKrw: v || undefined }), 700);
 
   const dates = Array.from(new Set(expenses.map((e) => e.date))).sort().reverse();
+
+  const members = useMemberNames();
+  const me = useMyName();
+  const canSettle = members.length >= 2;
+  const [showSettle, setShowSettle] = useState(false);
+  const settlement = useMemo(() => {
+    const payments = expenses
+      .filter((e) => e.paidBy)
+      .map((e) => ({ by: e.paidBy!, krw: Number(toKrw(e.amountVnd || '0', rate)) }));
+    return settle(payments, members);
+  }, [expenses, members, rate]);
+  const unassigned = expenses.filter((e) => !e.paidBy).length;
 
   const commitEdit = useDebounced((id: string, patch: Partial<Expense>) => {
     mutate((doc) => { const e = doc.expenses.find((x) => x.id === id); if (e) Object.assign(e, patch); });
@@ -158,9 +172,21 @@ export default function BudgetTab() {
               <span className="text-slate-500">{m.symbol}</span>
               <button onClick={() => remove(e.id)} className="text-slate-700 hover:text-rose-400"><Trash2 size={12} /></button>
             </div>
-            {local !== 'KRW' && (
-              <div className="text-right text-[11px] text-emerald-400">≈ {commas(toKrw(e.amountVnd || '0', rate))} 원</div>
-            )}
+            <div className="mt-1 flex items-center justify-between">
+              {canSettle ? (
+                <select
+                  defaultValue={e.paidBy ?? ''}
+                  onChange={(ev) => commitEdit(e.id, { paidBy: ev.target.value || undefined })}
+                  className="rounded bg-moose-edge px-1.5 py-0.5 text-[10px] text-slate-300 outline-none"
+                >
+                  <option value="">낸 사람 (정산 제외)</option>
+                  {members.map((n) => <option key={n} value={n}>{n} 냄</option>)}
+                </select>
+              ) : <span />}
+              {local !== 'KRW' && (
+                <span className="text-[11px] text-emerald-400">≈ {commas(toKrw(e.amountVnd || '0', rate))} 원</span>
+              )}
+            </div>
           </li>
         ))}
         {rows.length === 0 && <li><MooseEmpty line="아직 지출 내역이 없어요" sub={local === 'KRW' ? '지출을 기록해 보세요' : `${m.name}(으)로 입력하면 원화로 바로 환산돼요`} /></li>}
@@ -214,6 +240,45 @@ export default function BudgetTab() {
             {local !== 'KRW' && <div className="text-xs text-emerald-400">≈ {commas(totalKrw)} 원</div>}
           </div>
         </div>
+
+        {canSettle && (
+          <div className="mt-2 border-t border-moose-edge pt-2">
+            <button
+              onClick={() => setShowSettle((v) => !v)}
+              className="flex w-full items-center justify-between text-xs text-slate-300"
+            >
+              <span className="font-semibold">💸 정산</span>
+              <span className="text-slate-500">{showSettle ? '접기' : '누가 누구에게 얼마'}</span>
+            </button>
+            {showSettle && (
+              <div className="mt-2 space-y-1.5 text-[11px]">
+                {settlement.transfers.length === 0 ? (
+                  <p className="text-slate-500">정산할 금액이 없어요 (아직 낸 사람이 지정 안 됐거나 이미 공평)</p>
+                ) : (
+                  settlement.transfers.map((t, i) => (
+                    <div key={i} className="flex items-center justify-between rounded-lg bg-moose-dusk/70 px-3 py-2">
+                      <span className="flex items-center gap-1.5 text-slate-200">
+                        <b className={t.from === me ? 'text-moose-heart' : ''}>{t.from}</b>
+                        <ArrowRight size={12} className="text-slate-500" />
+                        <b className={t.to === me ? 'text-moose-heart' : ''}>{t.to}</b>
+                      </span>
+                      <span className="font-bold text-white">{commas(t.krw)}원</span>
+                    </div>
+                  ))
+                )}
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 pt-0.5 text-slate-500">
+                  <span>1인당 {commas(Math.round(settlement.share))}원</span>
+                  {members.map((n) => (
+                    <span key={n}>{n} {commas(Math.round(settlement.paid[n] ?? 0))}원 냄</span>
+                  ))}
+                </div>
+                {unassigned > 0 && (
+                  <p className="text-amber-400/80">· 낸 사람 미지정 {unassigned}건은 정산에서 빠졌어요</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {addOpen && (
@@ -227,9 +292,12 @@ export default function BudgetTab() {
 
 function AddForm({ projectId, rate, local, onDone }: { projectId: string; rate: number; local: string; onDone: () => void }) {
   const mutate = useAppStore((s) => s.mutate);
+  const members = useMemberNames();
+  const me = useMyName();
   const lm = currencyMeta(local);
   const today = new Date().toISOString().slice(0, 10);
   const [f, setF] = useState({ date: today, category: '식사' as ExpenseCategory, categoryEtc: '', vendor: '', amount: '' });
+  const [paidBy, setPaidBy] = useState(members.length >= 2 ? me : '');
   const [cur, setCur] = useState<'local' | 'KRW'>(local === 'KRW' ? 'KRW' : 'local');
 
   // 입력 통화와 무관하게 저장은 현지통화 원금 + KRW 환산 둘 다
@@ -248,6 +316,7 @@ function AddForm({ projectId, rate, local, onDone }: { projectId: string; rate: 
         vendor: f.vendor.trim(),
         amountVnd: String(vnd),
         amountKrw: String(krw),
+        paidBy: paidBy || undefined,
       });
     });
     setF({ ...f, vendor: '', amount: '', categoryEtc: '' });
@@ -270,6 +339,13 @@ function AddForm({ projectId, rate, local, onDone }: { projectId: string; rate: 
       )}
       <input value={f.vendor} onChange={(e) => setF({ ...f, vendor: e.target.value })}
         placeholder="어디에 썼나요 (예: 쌀국수, 택시)" className="w-full rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none" />
+      {members.length >= 2 && (
+        <select value={paidBy} onChange={(e) => setPaidBy(e.target.value)}
+          className="w-full rounded bg-moose-edge px-2 py-1.5 text-slate-100 outline-none">
+          <option value="">낸 사람 선택 안 함 (정산 제외)</option>
+          {members.map((n) => <option key={n} value={n}>{n}(이)가 냄</option>)}
+        </select>
+      )}
       <div className="flex items-center gap-2">
         <select
           value={cur}

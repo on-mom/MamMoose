@@ -189,6 +189,8 @@ export interface Expense {
   amountVnd: string;
   /** 환산된 KRW (문자열) */
   amountKrw: string;
+  /** 낸 사람 (동행자 이름). 없으면 정산에서 제외(공동 지출로 간주). */
+  paidBy?: string;
 }
 
 /** MY 탭 > 채팅 프로필 (내 프로필 — 로컬 보관) */
