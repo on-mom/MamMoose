@@ -23,17 +23,20 @@ export default function BudgetTab() {
   const local = currencyOf(project.timezone, project.destination);
   const m = currencyMeta(local);
 
+  // 수동 고정 환율은 VND(원래 기능)에만 적용. 그 외 통화는 항상 실시간/캐시.
+  const useFixed = settings.rateMode === 'fixed' && local === 'VND';
+
   const [live, setLive] = useState<number>(cachedRate(local));
   const [syncing, setSyncing] = useState(false);
   const refreshRate = () => {
     setSyncing(true);
     fetchRate(local).then((r) => { setLive(r); setSyncing(false); });
   };
-  useEffect(() => { setLive(cachedRate(local)); if (settings.rateMode === 'live') refreshRate(); }, [local]); // eslint-disable-line
+  useEffect(() => { setLive(cachedRate(local)); if (!useFixed && local !== 'KRW') refreshRate(); }, [local]); // eslint-disable-line
 
   const rate = local === 'KRW' ? 1
-    : settings.rateMode === 'live' ? live
-    : Number(settings.fixedVndToKrw) || fallbackRate(local);
+    : useFixed ? (Number(settings.fixedVndToKrw) || fallbackRate('VND'))
+    : (live || fallbackRate(local));
 
   const [fCat, setFCat] = useState<string>('전체');
   const [fDate, setFDate] = useState('');
@@ -74,7 +77,7 @@ export default function BudgetTab() {
       <div className="mt-2 flex items-center justify-between rounded-lg bg-moose-dusk/70 px-3 py-2 text-[11px]">
         <div className="flex items-center gap-2 text-slate-400">
           <span>1 {local} =</span>
-          {settings.rateMode === 'fixed' ? (
+          {useFixed ? (
             <input
               value={settings.fixedVndToKrw}
               onChange={(e) => setRate({ fixedVndToKrw: e.target.value })}
@@ -86,13 +89,15 @@ export default function BudgetTab() {
           <span>KRW</span>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setRate({ rateMode: settings.rateMode === 'fixed' ? 'live' : 'fixed' })}
-            className="rounded bg-moose-edge px-2 py-0.5 text-slate-300"
-          >
-            {settings.rateMode === 'fixed' ? '고정' : '실시간'}
-          </button>
-          {settings.rateMode === 'live' && (
+          {local === 'VND' && (
+            <button
+              onClick={() => setRate({ rateMode: settings.rateMode === 'fixed' ? 'live' : 'fixed' })}
+              className="rounded bg-moose-edge px-2 py-0.5 text-slate-300"
+            >
+              {useFixed ? '고정' : '실시간'}
+            </button>
+          )}
+          {!useFixed && (
             <button onClick={refreshRate} className="text-slate-400">
               <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
             </button>

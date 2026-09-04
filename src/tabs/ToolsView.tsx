@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Copy, ArrowLeftRight, Languages } from 'lucide-react';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
-import { cachedRate, toKrw, commas, fallbackRate } from '../lib/currency';
+import { cachedRate, fetchRate, toKrw, commas, fallbackRate } from '../lib/currency';
 import { currencyOf, currencyMeta, langOf, tzLabel } from '../lib/cities';
 import { PHRASES, PHRASE_LOC, GROUP_ORDER } from '../data/phrases';
 import { translateEnabled, translateBatch } from '../lib/translate';
@@ -129,9 +129,15 @@ function Phrasebook({ lang, tzText }: { lang: string; tzText: string }) {
 function FxCalc({ local }: { local: string }) {
   const settings = useAppStore((s) => s.settings);
   const lm = currencyMeta(local);
+  const [live, setLive] = useState<number>(cachedRate(local));
+  const useFixed = settings.rateMode === 'fixed' && local === 'VND';
+  useEffect(() => {
+    setLive(cachedRate(local));
+    if (!useFixed && local !== 'KRW') fetchRate(local).then(setLive);
+  }, [local]); // eslint-disable-line
   const rate = local === 'KRW' ? 1
-    : settings.rateMode === 'live' ? cachedRate(local)
-    : Number(settings.fixedVndToKrw) || fallbackRate(local);
+    : useFixed ? (Number(settings.fixedVndToKrw) || fallbackRate('VND'))
+    : (live || fallbackRate(local));
   const [dir, setDir] = useState<'l2k' | 'k2l'>('l2k');
   const [amount, setAmount] = useState('');
 

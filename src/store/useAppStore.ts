@@ -162,7 +162,8 @@ export const useAppStore = create<AppState>()(
       },
 
       activeTab: 'schedule',
-      setTab: (t) => set({ activeTab: t }),
+      // MY 로 새로 들어오면 항상 채팅부터. (같은 탭 내 이동은 mySub 유지 = 새로고침 대비)
+      setTab: (t) => set((s) => ({ activeTab: t, ...(t === 'my' && s.activeTab !== 'my' ? { mySub: 'chat' } : {}) })),
       mySub: 'chat',
       setMySub: (v) => set({ mySub: v }),
 
@@ -230,7 +231,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'mammoose-store',
-      version: 10,
+      version: 11,
       storage: createJSONStorage(() => safeStorage),
       migrate: (persisted: any, from) => {
         if (from < 9) {
@@ -296,6 +297,22 @@ export const useAppStore = create<AppState>()(
             persisted.activeProjectId = fresh.id;
           } else if (!persisted.projects.some((p: any) => p.id === persisted.activeProjectId)) {
             persisted.activeProjectId = persisted.projects[0].id;
+          }
+        }
+        if (from < 11) {
+          // 프로필명 입력 중 생긴 people 중복 스냅샷 정리 — 같은 userId 는 가장 긴 이름만 유지
+          for (const doc of Object.values(persisted?.present ?? {}) as any[]) {
+            const ppl = doc?.people;
+            if (!ppl) continue;
+            const byUid: Record<string, string[]> = {};
+            for (const [k, p] of Object.entries(ppl) as [string, any][]) {
+              if (p?.userId) (byUid[p.userId] ??= []).push(k);
+            }
+            for (const keys of Object.values(byUid)) {
+              if (keys.length < 2) continue;
+              const keep = [...keys].sort((a, b) => b.length - a.length)[0];
+              for (const k of keys) if (k !== keep) delete ppl[k];
+            }
           }
         }
         return persisted;

@@ -19,9 +19,10 @@ export default function TripSummary() {
   const [saving, setSaving] = useState(false);
 
   const local = currencyOf(project.timezone, project.destination);
+  const useFixed = settings.rateMode === 'fixed' && local === 'VND';
   const rate = local === 'KRW' ? 1
-    : settings.rateMode === 'live' ? cachedRate(local)
-    : Number(settings.fixedVndToKrw) || fallbackRate(local);
+    : useFixed ? (Number(settings.fixedVndToKrw) || fallbackRate('VND'))
+    : (cachedRate(local) || fallbackRate(local));
 
   const stats = useMemo(() => {
     const t = doc?.timeline ?? [];

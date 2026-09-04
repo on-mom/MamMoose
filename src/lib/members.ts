@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 
 /** 현재 사용자 표시 이름 — 앱에서 바꾼 프로필명이 우선(카톡 기본 닉네임보다). */
@@ -19,13 +19,15 @@ const isJunkName = (k: string) => !k || !k.replace(/[\s.·・_-]/g, '');
 export function useMemberNames(): string[] {
   const people = useAppStore((s) => s.present[s.activeProjectId]?.people);
   const cloudName = useAppStore((s) => s.cloudUser?.name);
+  const myUid = useAppStore((s) => s.cloudUser?.id);
   const me = useMyName();
 
   const set = new Set<string>([me]);
-  for (const k of Object.keys(people ?? {})) {
-    if (k === me || k === cloudName) continue; // 나 / 로그인 기본 닉네임(닉 변경 전 스냅샷)
-    if (k === '나' && me !== '나') continue;   // 이름 정하기 전 내 스냅샷
-    if (isJunkName(k)) continue;               // "." 같은 카톡 기본 프로필명
+  for (const [k, p] of Object.entries(people ?? {})) {
+    if (k === me || k === cloudName) continue;     // 나 / 로그인 기본 닉네임
+    if (k === '나' && me !== '나') continue;       // 이름 정하기 전 내 스냅샷
+    if (isJunkName(k)) continue;                   // "." 같은 카톡 기본 프로필명
+    if (myUid && (p as { userId?: string })?.userId === myUid) continue; // 옛 이름의 내 스냅샷
     set.add(k);
   }
   return [...set];
@@ -47,26 +49,42 @@ export function useRegisterMe() {
   const profile = useAppStore((s) => s.profile);
   const cloudUser = useAppStore((s) => s.cloudUser);
   const mutate = useAppStore((s) => s.mutate);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
-    const cur = useAppStore.getState().present[projectId]?.people ?? {};
-    const wantAvatar = profile.avatarDataUrl || cloudUser?.avatar || null;
-    const staleKeys = [cloudUser?.name, profile.displayName, '나'].filter(
-      (n): n is string => !!n && n !== me && !!cur[n],
-    );
-    const uidWant = cloudUser?.id;
-    if (cur[me]?.name === me && cur[me]?.avatar === wantAvatar && cur[me]?.userId === uidWant && !staleKeys.length) return;
-    mutate((doc) => {
-      doc.people = doc.people ?? {};
-      for (const k of staleKeys) delete doc.people[k];
-      doc.people[me] = {
-        ...(doc.people[me] ?? { bg: null, statusMessage: '' }),
-        name: me,
-        avatar: wantAvatar,
-        ...(uidWant ? { userId: uidWant } : {}),
-      };
-    });
+    // 프로필명 입력 중 매 글자마다 people 이 오염되지 않도록 1초 디바운스
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      const uidWant = cloudUser?.id ?? null;
+      const wantAvatar = profile.avatarDataUrl || cloudUser?.avatar || null;
+      const cur = useAppStore.getState().present[projectId]?.people ?? {};
+
+      // 삭제 대상: 내 옛 이름 스냅샷 전부
+      //  - userId 가 나와 같은 키 (로그인 상태 — 입력 중 생긴 중간 이름 포함)
+      //  - 알려진 옛 이름(로그인 기본닉·직전 displayName·'나')
+      const staleKeys = Object.keys(cur).filter((k) => {
+        if (k === me) return false;
+        if (uidWant && (cur[k] as { userId?: string })?.userId === uidWant) return true;
+        return k === cloudUser?.name || k === profile.displayName || k === '나';
+      });
+
+      const fresh = cur[me]?.name === me && cur[me]?.avatar === wantAvatar
+        && (cur[me] as { userId?: string })?.userId === (uidWant ?? undefined);
+      if (fresh && !staleKeys.length) return;
+
+      mutate((doc) => {
+        doc.people = doc.people ?? {};
+        for (const k of staleKeys) delete doc.people[k];
+        doc.people[me] = {
+          ...(doc.people[me] ?? { bg: null, statusMessage: '' }),
+          name: me,
+          avatar: wantAvatar,
+          ...(uidWant ? { userId: uidWant } : {}),
+        };
+      });
+    }, 1000);
+    return () => { if (timer.current) clearTimeout(timer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, me, profile.avatarDataUrl, cloudUser?.avatar, cloudUser?.id]);
 }
