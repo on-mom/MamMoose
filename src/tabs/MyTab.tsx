@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Check, LogOut, Plus, Send, Camera, Image as ImageIcon, UserPlus, Copy, AlertTriangle,
-  MoreVertical, Pencil, Trash2, Loader2,
+  MoreVertical, Pencil, Trash2, Loader2, ChevronRight, ChevronLeft,
 } from 'lucide-react';
 import type { Project, Person } from '../types';
-import { useAppStore, useActiveProject } from '../store/useAppStore';
+import { useAppStore, useActiveProject, type CloudUser } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { cloudEnabled, signOut } from '../lib/supabase';
 import { createInvite, acceptInvite, deleteCloudTrip, ejectMember, deleteMyAccount } from '../store/cloudSync';
@@ -805,15 +805,11 @@ function Settings() {
   const [cur, setCur] = useState('');
   const [next, setNext] = useState('');
   const [msg, setMsg] = useState('');
-  const [wipe, setWipe] = useState<null | 'ask' | 'busy'>(null);
-  const [wipeAgree, setWipeAgree] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
 
-  const doWipe = async () => {
-    setWipe('busy');
-    const r = await deleteMyAccount();
-    if (!r.ok) { setWipe('ask'); alert('탈퇴 처리 실패: ' + (r.error ?? '알 수 없음')); return; }
-    location.reload();
-  };
+  if (showAccount && cloudUser) {
+    return <AccountDetail user={cloudUser} onBack={() => setShowAccount(false)} />;
+  }
 
   const toggleNotify = async () => {
     if (settings.notifyMemories) {
@@ -836,26 +832,16 @@ function Settings() {
   return (
     <div className="space-y-4 overflow-y-auto text-sm">
       {cloudUser ? (
-        <section className="space-y-3 card p-3">
-          <div className="flex items-center gap-3">
-            {cloudUser.avatar
-              ? <img src={cloudUser.avatar} alt="" className="h-10 w-10 rounded-full object-cover" />
-              : <div className="h-10 w-10 overflow-hidden rounded-full bg-moose-edge"><Moose variant="face" className="h-full w-full object-cover" alt="" /></div>}
-            <div>
-              <div className="font-semibold text-white">{cloudUser.name}</div>
-              <div className="text-[11px] text-emerald-400">클라우드 로그인됨 · 동행자와 실시간 동기화</div>
-            </div>
+        <button onClick={() => setShowAccount(true)} className="flex w-full items-center gap-3 card p-3 text-left">
+          {cloudUser.avatar
+            ? <img src={cloudUser.avatar} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+            : <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-moose-edge"><Moose variant="face" className="h-full w-full object-cover" alt="" /></div>}
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-semibold text-white">{cloudUser.name}</div>
+            <div className="text-[11px] text-emerald-400">클라우드 로그인됨 · 동행자와 실시간 동기화</div>
           </div>
-          <button onClick={signOut} className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700 py-2 text-slate-300">
-            <LogOut size={14} /> 로그아웃
-          </button>
-          <button
-            onClick={() => { setWipeAgree(false); setWipe('ask'); }}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-rose-500/40 py-2 text-[13px] text-rose-400"
-          >
-            <Trash2 size={13} /> 회원 탈퇴 (모든 데이터 삭제)
-          </button>
-        </section>
+          <ChevronRight size={16} className="shrink-0 text-slate-500" />
+        </button>
       ) : (
         <section className="space-y-2 card p-3">
           <h3 className="font-semibold text-white">PIN 번호 변경</h3>
@@ -902,6 +888,58 @@ function Settings() {
       <p className="text-center text-[10px] text-slate-600">
         맘무스 v0.4 · {cloudEnabled ? '클라우드 연결됨' : '로컬 모드'}
       </p>
+    </div>
+  );
+}
+
+/* ---------- 설정 › 내 계정 상세 (로그인 정보 · 로그아웃 · 회원 탈퇴) ---------- */
+const maskEmail = (e?: string | null) => {
+  if (!e || !e.includes('@')) return e || '';
+  const [u, d] = e.split('@');
+  const head = u.slice(0, Math.min(2, u.length));
+  return `${head}${'*'.repeat(Math.max(3, u.length - head.length))}@${d}`;
+};
+const providerLabel = (p?: string | null) =>
+  p === 'kakao' ? '카카오 로그인' : p === 'google' ? '구글 로그인' : p ? `${p} 로그인` : '소셜 로그인';
+
+function AccountDetail({ user, onBack }: { user: CloudUser; onBack: () => void }) {
+  const [wipe, setWipe] = useState<null | 'ask' | 'busy'>(null);
+  const [agree, setAgree] = useState(false);
+
+  const doWipe = async () => {
+    setWipe('busy');
+    const r = await deleteMyAccount();
+    if (!r.ok) { setWipe('ask'); alert('탈퇴 처리 실패: ' + (r.error ?? '알 수 없음')); return; }
+    location.reload();
+  };
+
+  return (
+    <div className="space-y-5 overflow-y-auto text-sm">
+      <button onClick={onBack} className="flex items-center gap-1 text-[13px] text-slate-400">
+        <ChevronLeft size={16} /> 설정
+      </button>
+
+      <div className="flex flex-col items-center gap-2 pt-2">
+        {user.avatar
+          ? <img src={user.avatar} alt="" className="h-20 w-20 rounded-full object-cover" />
+          : <div className="h-20 w-20 overflow-hidden rounded-full bg-moose-edge"><Moose variant="face" className="h-full w-full object-cover" alt="" /></div>}
+        <div className="text-lg font-bold text-white">{user.name}</div>
+        <div className="rounded-full bg-white/[0.05] px-3 py-1 text-[12px] text-slate-300">
+          {providerLabel(user.provider)}{user.email ? ` · ${maskEmail(user.email)}` : ''}
+        </div>
+      </div>
+
+      <div className="space-y-2 pt-2">
+        <button onClick={signOut} className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 py-2.5 text-slate-200">
+          <LogOut size={15} /> 로그아웃
+        </button>
+        <button
+          onClick={() => { setAgree(false); setWipe('ask'); }}
+          className="w-full py-1 text-center text-[11px] text-slate-500 underline decoration-slate-600 underline-offset-2"
+        >
+          회원 탈퇴 (모든 데이터 삭제)
+        </button>
+      </div>
 
       {wipe && (
         <Modal
@@ -914,7 +952,7 @@ function Settings() {
               </button>
               <button
                 onClick={doWipe}
-                disabled={!wipeAgree || wipe === 'busy'}
+                disabled={!agree || wipe === 'busy'}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
               >
                 {wipe === 'busy' ? <Loader2 size={15} className="animate-spin" /> : '삭제하겠습니다'}
@@ -929,7 +967,7 @@ function Settings() {
             </p>
             <p className="text-[12px] text-slate-400">동행자와 공유 중인 여행이 있다면, 그 여행도 함께 사라집니다.</p>
             <label className="flex items-start gap-2 rounded-lg bg-white/[0.04] p-2.5">
-              <input type="checkbox" checked={wipeAgree} onChange={(e) => setWipeAgree(e.target.checked)} className="mt-0.5 accent-rose-500" />
+              <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 accent-rose-500" />
               <span>위 내용을 이해했으며, 데이터가 삭제되어 복구할 수 없음에 동의합니다.</span>
             </label>
           </div>

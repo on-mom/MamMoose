@@ -156,6 +156,9 @@ export function initCloudSync() {
         id: session.user.id,
         name: m.name || m.full_name || m.nickname || m.user_name || '여행자',
         avatar: m.avatar_url || m.picture || null,
+        email: session.user.email ?? m.email ?? null,
+        provider: session.user.app_metadata?.provider
+          ?? session.user.identities?.[0]?.provider ?? null,
       });
       useAppStore.setState({ unlocked: true });
       bootstrapTried = false;

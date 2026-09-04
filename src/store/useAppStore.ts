@@ -49,6 +49,9 @@ export interface CloudUser {
   id: string;
   name: string;
   avatar: string | null;
+  email?: string | null;
+  /** 로그인 수단 — 'kakao' | 'google' 등 */
+  provider?: string | null;
 }
 
 interface AppState {
