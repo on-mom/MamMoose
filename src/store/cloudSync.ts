@@ -22,6 +22,7 @@ let pushTimer: ReturnType<typeof setTimeout> | undefined;
 let channel: RealtimeChannel | null = null;
 let unsubStore: (() => void) | null = null;
 let currentUid: string | null = null;
+let watchedIds = '';
 /** 여행별 "마지막으로 서버와 맞춘 문서" — 3-way 병합의 기준(base) */
 const baseDocs: Record<string, TripDoc> = {};
 
@@ -88,6 +89,7 @@ async function fetchTrips() {
   const st = useAppStore.getState();
   notifyNewComments(docs, st.cloudUser?.name ?? '', !!st.settings.notifyMemories);
   if (needPush.length) { clearTimeout(pushTimer); pushTimer = setTimeout(() => pushTrip(needPush[0]), 400); }
+  startRealtime(rows.map((r) => r.id));
 }
 
 /** 첫 로그인: 현재 로컬 활성 여행을 클라우드로 1회 올린다 (루프 방지: bootstrapTried) */
@@ -150,17 +152,27 @@ async function pushTrip(id: string) {
   }
 }
 
-function startRealtime() {
-  if (!supabase || channel) return;
-  channel = supabase
-    .channel('trips-sync')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, (payload) => {
-      const me = useAppStore.getState().cloudUser?.id;
-      const by = (payload.new as { updated_by?: string } | null)?.updated_by;
-      if (payload.eventType === 'UPDATE' && by && by === me) return; // 내 변경 에코 무시
-      fetchTrips();
-    })
-    .subscribe();
+/** 내 여행 id 로 범위를 좁힌 realtime 구독 — 사용자가 많아져도 남의 여행 변경엔 안 깨어남 */
+function startRealtime(tripIds: string[]) {
+  if (!supabase) return;
+  const key = [...tripIds].sort().join(',');
+  if (channel && key === watchedIds) return; // 구독 대상 그대로면 유지
+  if (channel) { supabase.removeChannel(channel); channel = null; }
+  watchedIds = key;
+  if (!tripIds.length) return;
+
+  const onChange = (payload: { eventType?: string; new: unknown }) => {
+    const me = useAppStore.getState().cloudUser?.id;
+    const by = (payload.new as { updated_by?: string } | null)?.updated_by;
+    if (payload.eventType === 'UPDATE' && by && by === me) return; // 내 변경 에코 무시
+    fetchTrips();
+  };
+  let ch = supabase.channel('trips-sync');
+  // postgres_changes 필터는 절당 값 1개 → id 마다 절을 추가
+  for (const id of tripIds) {
+    ch = ch.on('postgres_changes', { event: '*', schema: 'public', table: 'trips', filter: `id=eq.${id}` }, onChange);
+  }
+  channel = ch.subscribe();
 }
 
 function teardown() {
@@ -168,6 +180,7 @@ function teardown() {
   unsubStore?.();
   unsubStore = null;
   bootstrapTried = false;
+  watchedIds = '';
   for (const k of Object.keys(baseDocs)) delete baseDocs[k];
   if (channel && supabase) { supabase.removeChannel(channel); channel = null; }
 }
@@ -196,9 +209,8 @@ export function initCloudSync() {
       });
       useAppStore.setState({ unlocked: true });
       bootstrapTried = false;
-      await fetchTrips();
+      await fetchTrips();       // fetchTrips 안에서 내 여행 id 로 realtime 구독
       startPushWatcher();
-      startRealtime();
     } else {
       teardown();
       useAppStore.getState().resetLocal();

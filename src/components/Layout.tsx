@@ -48,7 +48,7 @@ export default function Layout() {
             </div>
             {project && (
               <div className="truncate text-[11px] text-slate-400">
-                {project.destination} · {project.startDate}~{project.endDate}
+                {[project.destination, `${project.startDate}~${project.endDate}`].filter(Boolean).join(' · ')}
               </div>
             )}
           </div>
