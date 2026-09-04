@@ -5,6 +5,7 @@ import { useAppStore, useActiveProject } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { useMyName } from '../lib/members';
 import { usePlaces, splitAreas, isSeedPlace, KIND_LABEL, type Place, type PlaceKind } from '../lib/places';
+import { usePlacePhoto } from '../lib/placePhoto';
 import { coordsForArea, AREA_COORDS } from '../lib/areaCoords';
 import { geocode } from '../lib/geocode';
 import { directionsUrl } from '../lib/maps';
@@ -62,6 +63,8 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
     [places, filter, zonesEnabled],
   );
   const detail = detailId ? places.find((p) => p.id === detailId) ?? null : null;
+  const wikiPhoto = usePlacePhoto(detail?.name, detail?.origName);
+  const detailPhoto = detail?.poi?.photo || wikiPhoto;
   const focusPlace = focusId ? results.find((p) => p.id === focusId) ?? null : null;
 
   const geocodePlace = (p: Place) => {
@@ -364,6 +367,20 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
           }
         >
           <div className="space-y-3">
+            {detailPhoto && (
+              <div className="relative -mx-5 -mt-4 overflow-hidden">
+                <img
+                  src={detailPhoto}
+                  alt={detail.name}
+                  loading="lazy"
+                  onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
+                  className="h-40 w-full object-cover"
+                />
+                {!detail.poi?.photo && (
+                  <span className="absolute bottom-1 right-1.5 rounded bg-black/45 px-1 py-0.5 text-[8px] text-white/70">위키피디아</span>
+                )}
+              </div>
+            )}
             {detail.rating ? <div className="text-[13px] text-slate-300">★ {detail.rating}</div> : null}
             {detail.menu && (
               <div className="flex gap-2 rounded-xl bg-moose-heart/10 p-3">
