@@ -5,6 +5,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useAppStore, emptyDoc, flightRows } from './useAppStore';
 import { notifyNewComments } from '../lib/notify';
+import { mergeDoc, docDiffers } from './mergeDoc';
 import type { Project, TripDoc } from '../types';
 
 interface TripRow {
@@ -21,6 +22,8 @@ let pushTimer: ReturnType<typeof setTimeout> | undefined;
 let channel: RealtimeChannel | null = null;
 let unsubStore: (() => void) | null = null;
 let currentUid: string | null = null;
+/** 여행별 "마지막으로 서버와 맞춘 문서" — 3-way 병합의 기준(base) */
+const baseDocs: Record<string, TripDoc> = {};
 
 const isCloudId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-/.test(id);
 
@@ -61,14 +64,30 @@ async function fetchTrips() {
 
   err(null);
   const projects: Project[] = rows.map((r) => ({ ...r.meta, id: r.id, ownerId: r.owner }));
+  const localPresent = useAppStore.getState().present;
   const docs: Record<string, TripDoc> = {};
-  for (const r of rows) docs[r.id] = sanitizeDoc(r.doc);
+  const needPush: string[] = [];
+  for (const r of rows) {
+    const remote = sanitizeDoc(r.doc);
+    const base = baseDocs[r.id];
+    const local = localPresent[r.id];
+    // 로컬에 아직 서버로 안 올라간 편집이 있으면 항목 단위로 병합, 아니면 서버본 채택
+    if (base && local && docDiffers(local, base)) {
+      const merged = mergeDoc(base, local, remote) as TripDoc;
+      docs[r.id] = merged;
+      if (docDiffers(merged, remote)) needPush.push(r.id);
+    } else {
+      docs[r.id] = remote;
+    }
+    baseDocs[r.id] = docs[r.id];
+  }
   applyingRemote = true;
   useAppStore.getState().hydrateCloud(projects, docs);
   applyingRemote = false;
 
   const st = useAppStore.getState();
   notifyNewComments(docs, st.cloudUser?.name ?? '', !!st.settings.notifyMemories);
+  if (needPush.length) { clearTimeout(pushTimer); pushTimer = setTimeout(() => pushTrip(needPush[0]), 400); }
 }
 
 /** 첫 로그인: 현재 로컬 활성 여행을 클라우드로 1회 올린다 (루프 방지: bootstrapTried) */
@@ -106,15 +125,29 @@ async function pushTrip(id: string) {
   if (!supabase) return;
   const s = useAppStore.getState();
   const proj = s.projects.find((p) => p.id === id);
-  const doc = s.present[id];
+  const local = s.present[id];
   const user = s.cloudUser;
-  if (!proj || !doc || !user) return;
+  if (!proj || !local || !user) return;
+
+  // 보내기 직전 서버 최신본과 병합 (내 push 가 상대의 최근 편집을 덮지 않도록)
+  let toSend: TripDoc = local;
+  const { data: cur } = await supabase.from('trips').select('doc').eq('id', id).maybeSingle();
+  if (cur?.doc && baseDocs[id]) {
+    toSend = mergeDoc(baseDocs[id], local, sanitizeDoc(cur.doc as TripDoc)) as TripDoc;
+  }
+
   const { error } = await supabase
     .from('trips')
-    .update({ doc: sanitizeDoc(doc), meta: stripId(proj), updated_at: new Date().toISOString(), updated_by: user.id })
+    .update({ doc: sanitizeDoc(toSend), meta: stripId(proj), updated_at: new Date().toISOString(), updated_by: user.id })
     .eq('id', id);
-  if (error) err('동기화 실패: ' + error.message);
-  else err(null);
+  if (error) { err('동기화 실패: ' + error.message); return; }
+  err(null);
+  baseDocs[id] = toSend;
+  if (toSend !== local) {
+    applyingRemote = true;
+    useAppStore.getState().patchDoc(id, toSend);
+    applyingRemote = false;
+  }
 }
 
 function startRealtime() {
@@ -135,6 +168,7 @@ function teardown() {
   unsubStore?.();
   unsubStore = null;
   bootstrapTried = false;
+  for (const k of Object.keys(baseDocs)) delete baseDocs[k];
   if (channel && supabase) { supabase.removeChannel(channel); channel = null; }
 }
 

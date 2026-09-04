@@ -69,6 +69,8 @@ interface AppState {
   setCloudUser: (u: CloudUser | null) => void;
   /** 클라우드에서 받은 여행 목록/문서로 전체 교체 */
   hydrateCloud: (projects: Project[], docs: Docs) => void;
+  /** 한 여행 문서만 교체 (동기화 병합 결과 반영) */
+  patchDoc: (id: string, doc: TripDoc) => void;
   /** 로컬 빈 여행 상태로 초기화 (로그아웃) */
   resetLocal: () => void;
   /** 클라우드 로그인 직후 — 이전 세션의 로컬 여행·프로필·테마를 비우고 클라우드만 반영 */
@@ -135,6 +137,8 @@ export const useAppStore = create<AppState>()(
           past: [],
           future: [],
         })),
+      patchDoc: (id, doc) =>
+        set((s) => ({ present: { ...s.present, [id]: doc }, past: [], future: [] })),
       resetLocal: () => {
         const fresh = blankProject();
         set((s) => ({
