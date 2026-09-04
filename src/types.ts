@@ -236,7 +236,7 @@ export interface DiaryEntry {
 
 /** MY 탭 > 설정 + 앱 전역 설정 */
 export interface AppSettings {
-  /** 접근 PIN (기본 250914) */
+  /** 접근 PIN — 사용자가 최초 진입 시 직접 설정 ('' = 미설정) */
   pin: string;
   /** VND→KRW 고정 환율 (1 VND = ? KRW). 실시간 연동 전까지 고정값 사용 */
   fixedVndToKrw: string;

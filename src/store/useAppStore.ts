@@ -18,7 +18,6 @@ import type {
 import { blankProject, flightTimelineItem } from '../data/seed';
 import { commit, undo as histUndo, redo as histRedo } from './history';
 
-const DEFAULT_PIN = '250914';
 // 고정 fallback 환율: 1 VND = 0.055 KRW (실시간 API 실패 시)
 const DEFAULT_VND_KRW = '0.055';
 
@@ -118,7 +117,8 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       unlocked: false,
       unlock: (pin) => {
-        const ok = pin === get().settings.pin;
+        const saved = get().settings.pin;
+        const ok = !!saved && pin === saved;
         if (ok) set({ unlocked: true });
         return ok;
       },
@@ -227,7 +227,7 @@ export const useAppStore = create<AppState>()(
       profile: { displayName: '', avatarDataUrl: null, chatBgDataUrl: null },
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
 
-      settings: { pin: DEFAULT_PIN, fixedVndToKrw: DEFAULT_VND_KRW, rateMode: 'fixed' },
+      settings: { pin: '', fixedVndToKrw: DEFAULT_VND_KRW, rateMode: 'fixed' },
       setPin: (next) => set((s) => ({ settings: { ...s.settings, pin: next } })),
       setRate: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
       setNotifyMemories: (on) => set((s) => ({ settings: { ...s.settings, notifyMemories: on } })),
@@ -235,9 +235,13 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'mammoose-store',
-      version: 11,
+      version: 12,
       storage: createJSONStorage(() => safeStorage),
       migrate: (persisted: any, from) => {
+        if (from < 12) {
+          // PIN 저장 방식 변경(소스 하드코딩 제거) — 기존 PIN 초기화, 다음 진입 때 직접 설정
+          if (persisted?.settings) persisted.settings.pin = '';
+        }
         if (from < 9) {
           // 항공편 자동 생성 행에 flightLeg 태그 (수정 시 자동 갱신되도록)
           for (const doc of Object.values(persisted?.present ?? {}) as any[]) {
