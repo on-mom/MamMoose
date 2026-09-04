@@ -22,6 +22,7 @@ import { firstSentence } from '../lib/notify';
 import { useMemberNames, useMyName } from '../lib/members';
 import { usePlaces } from '../lib/places';
 import { regionFor } from '../data/regions';
+import { useTripPresence } from '../lib/presence';
 import Modal from '../components/Modal';
 import { PlaceFilterControls, applyPlaceFilter, emptyFilterState, type PlaceFilterState } from '../components/PlaceFilter';
 import CommentThread from '../components/CommentThread';
@@ -65,6 +66,8 @@ export default function TimelineView() {
   const [pickFilter, setPickFilter] = useState<PlaceFilterState>(emptyFilterState);
   const zonesEnabled = regionFor(project.destination, project.timezone, project.name)?.id === 'hanoi';
   const [mode, setMode] = useState<'read' | 'edit'>('read');
+  const peers = useTripPresence(mode === 'edit');
+  const editingPeers = peers.filter((p) => p.editing);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [reviewFor, setReviewFor] = useState<TimelineItem | null>(null);
 
@@ -203,9 +206,18 @@ export default function TimelineView() {
           </button>
         </div>
         <span className="pr-1 text-[10px] text-slate-500">
-          {mode === 'read' ? '항목을 눌러 좋아요·코멘트' : '저장 내용은 동행자에게 바로 반영'}
+          {peers.length > 0
+            ? `${peers.map((p) => p.name).join(', ')}님 함께 보는 중`
+            : mode === 'read' ? '항목을 눌러 좋아요·코멘트' : '저장 내용은 동행자에게 바로 반영'}
         </span>
       </div>
+
+      {mode === 'edit' && editingPeers.length > 0 && (
+        <div className="rounded-lg bg-amber-500/15 px-3 py-2 text-[11px] leading-relaxed text-amber-300">
+          ✏️ {editingPeers.map((p) => p.name).join(', ')}님도 지금 편집 중이에요.
+          같은 항목을 동시에 고치면 나중에 저장한 쪽이 남아요.
+        </div>
+      )}
 
       {picker && (
         <Modal onClose={() => setPicker(false)} title={<span className="text-sm font-semibold text-white">추천 스팟에서 담기</span>}>
