@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
-import { Crosshair, X, LocateFixed, Loader2, Navigation } from 'lucide-react';
+import { Crosshair, X, LocateFixed, Loader2, Navigation, Route } from 'lucide-react';
 import { GMAPS_LIBRARIES, GMAPS_LANGUAGE } from '../lib/gmaps';
 import type { TimelineItem } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
@@ -19,6 +19,7 @@ type Placed = TimelineItem & { lat: number; lng: number };
 export default function MapView() {
   const project = useActiveProject()!;
   const items = useAppStore((s) => s.present[s.activeProjectId]?.timeline ?? []);
+  const hotels = useAppStore((s) => s.present[s.activeProjectId]?.hotels ?? []);
   const mutate = useAppStore((s) => s.mutate);
   const days = tripDays(project.startDate, project.endDate);
   const [day, setDay] = useState(1);
@@ -62,6 +63,40 @@ export default function MapView() {
   // 다른 날로 넘어가면 선택 해제
   useEffect(() => setSelected(null), [day]);
 
+  // ---- 동선 정렬: 숙소(주소 지오코딩) 또는 첫 장소를 기준점으로 ----
+  const [hotelPt, setHotelPt] = useState<{ lat: number; lng: number; name: string } | null>(null);
+  useEffect(() => {
+    const h = hotels.find((x) => x.address && x.address.trim());
+    if (!h || !KEY) { setHotelPt(null); return; }
+    let alive = true;
+    geocode(h.address).then((r) => { if (alive && r) setHotelPt({ ...r, name: h.name }); });
+    return () => { alive = false; };
+  }, [hotels]);
+
+  const anchor = hotelPt ?? (placed[0] ? { lat: placed[0].lat, lng: placed[0].lng, name: placed[0].place } : null);
+
+  const sortRoute = (mode: 'near' | 'far' | 'reverse') => {
+    if (dayItems.length < 2 || (mode !== 'reverse' && !anchor)) return;
+    const outbound = dayItems.filter((i) => i.flightLeg === 'outbound');
+    const inbound = dayItems.filter((i) => i.flightLeg === 'inbound');
+    const movable = dayItems.filter((i) => !i.flightLeg);
+    let ordered: TimelineItem[];
+    if (mode === 'reverse') {
+      ordered = [...movable].reverse();
+    } else {
+      const d2 = (i: TimelineItem) =>
+        i.lat == null || i.lng == null ? Infinity : (i.lat - anchor!.lat) ** 2 + (i.lng - anchor!.lng) ** 2;
+      ordered = [...movable].sort((a, b) => (mode === 'near' ? d2(a) - d2(b) : d2(b) - d2(a)));
+    }
+    const final = [...outbound, ...ordered, ...inbound];
+    mutate((doc) => {
+      final.forEach((it, idx) => {
+        const t = doc.timeline.find((x) => x.id === it.id);
+        if (t) t.order = idx;
+      });
+    });
+  };
+
   const pickRow = async (it: TimelineItem) => {
     setSelected(it.id);
     if (it.lat == null && KEY && it.place && it.place !== '새 일정') {
@@ -104,6 +139,31 @@ export default function MapView() {
         height="240px"
         hint="Mock Map · 아래 목록에서 '지도에 배치'로 핀 추가"
       />
+
+      {dayItems.filter((i) => !i.flightLeg).length >= 2 && (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-moose-dusk/50 px-2.5 py-2 text-[11px]">
+          <span className="flex items-center gap-1 text-slate-400"><Route size={12} /> 동선 정렬</span>
+          <button
+            onClick={() => sortRoute('near')}
+            disabled={!anchor}
+            className="rounded-md bg-white/5 px-2 py-1 text-slate-200 disabled:opacity-40"
+          >가까운 순</button>
+          <button
+            onClick={() => sortRoute('far')}
+            disabled={!anchor}
+            className="rounded-md bg-white/5 px-2 py-1 text-slate-200 disabled:opacity-40"
+          >먼 순</button>
+          <button
+            onClick={() => sortRoute('reverse')}
+            className="rounded-md bg-white/5 px-2 py-1 text-slate-200"
+          >↕ 뒤집기</button>
+          {anchor && (
+            <span className="w-full text-[10px] text-slate-500">
+              기준: {hotelPt ? `숙소 ${hotelPt.name}` : `첫 장소 ${anchor.name}`}
+            </span>
+          )}
+        </div>
+      )}
 
       <ul className="space-y-1.5">
         {dayItems.length === 0 && (
