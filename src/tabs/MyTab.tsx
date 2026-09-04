@@ -27,7 +27,8 @@ const hhmm = (ts: number) =>
   new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
 export default function MyTab() {
-  const [sub, setSub] = useState<Sub>('chat');
+  const setSub = useAppStore((s) => s.setMySub);
+  const savedSub = useAppStore((s) => s.mySub) as Sub;
   const cloudError = useAppStore((s) => s.cloudError);
   const project = useActiveProject();
   const picks = useMemoryPicks();
@@ -46,6 +47,8 @@ export default function MyTab() {
     ...(showMemories ? [['memories', '추억함'] as [Sub, string]] : []),
     ['tools', '도구'], ['trips', '여행'], ['settings', '설정'],
   ];
+  // 저장된 탭이 지금 목록에 없으면(예: 추억함이 사라짐) 채팅으로
+  const sub: Sub = tabs.some(([k]) => k === savedSub) ? savedSub : 'chat';
 
   return (
     <div className="edge flex h-full flex-col py-3">

@@ -76,6 +76,9 @@ interface AppState {
 
   // --- 탭 네비게이션 ---
   activeTab: TabKey;
+  /** MY 탭 내 하위 탭(채팅/일기/도구/여행/설정) — 새로고침 유지 */
+  mySub: string;
+  setMySub: (v: string) => void;
   setTab: (t: TabKey) => void;
 
   // --- 다중 여행 프로젝트 ---
@@ -160,6 +163,8 @@ export const useAppStore = create<AppState>()(
 
       activeTab: 'schedule',
       setTab: (t) => set({ activeTab: t }),
+      mySub: 'chat',
+      setMySub: (v) => set({ mySub: v }),
 
       projects: [START_PROJECT],
       activeProjectId: START_PROJECT.id,
@@ -304,6 +309,8 @@ export const useAppStore = create<AppState>()(
         present: s.present,
         profile: s.profile,
         settings: s.settings,
+        activeTab: s.activeTab, // 새로고침해도 보던 탭 유지
+        mySub: s.mySub,
       }),
     },
   ),
