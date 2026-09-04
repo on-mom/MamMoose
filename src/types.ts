@@ -265,4 +265,13 @@ export interface TripDoc {
   people?: Record<string, Person>;
   /** 한 줄 일기 */
   diary?: DiaryEntry[];
+  /** 짐 체크리스트 */
+  packing?: PackingItem[];
+}
+
+export interface PackingItem {
+  id: string;
+  label: string;
+  cat?: string;
+  done: boolean;
 }

@@ -10,7 +10,7 @@ type Row = { id: string } & Record<string, unknown>;
 type Doc = Record<string, unknown>;
 
 export const ARRAY_FIELDS = [
-  'timeline', 'restaurants', 'hotels', 'spots', 'todos', 'expenses', 'messages', 'diary',
+  'timeline', 'restaurants', 'hotels', 'spots', 'todos', 'expenses', 'messages', 'diary', 'packing',
 ] as const;
 
 const eq = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);

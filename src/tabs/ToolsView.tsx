@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, ArrowLeftRight, Languages } from 'lucide-react';
+import { Copy, ArrowLeftRight, Languages, Plus, X } from 'lucide-react';
+import type { Project } from '../types';
 import { useAppStore, useActiveProject } from '../store/useAppStore';
+import { uid } from '../lib/uid';
 import { cachedRate, fetchRate, toKrw, commas, fallbackRate } from '../lib/currency';
 import { currencyOf, currencyMeta, langOf, tzLabel } from '../lib/cities';
 import { PHRASES, PHRASE_LOC, GROUP_ORDER } from '../data/phrases';
+import { packingPreset } from '../data/packing';
 import { translateEnabled, translateBatch } from '../lib/translate';
 
-type Sub = 'phrase' | 'fx';
+type Sub = 'phrase' | 'fx' | 'pack';
 const gtUrl = (ko: string, tl: string) =>
   `https://translate.google.com/?sl=ko&tl=${tl}&text=${encodeURIComponent(ko)}&op=translate`;
 
@@ -19,7 +22,7 @@ export default function ToolsView() {
   return (
     <div className="space-y-3 overflow-y-auto pb-2">
       <div className="flex gap-1 rounded-lg bg-moose-edge p-1 text-[11px]">
-        {([['phrase', '🗣️ 회화'], ['fx', '💱 환율']] as const).map(([k, l]) => (
+        {([['phrase', '🗣️ 회화'], ['fx', '💱 환율'], ['pack', '🎒 짐']] as const).map(([k, l]) => (
           <button
             key={k}
             onClick={() => setSub(k)}
@@ -31,6 +34,7 @@ export default function ToolsView() {
       </div>
       {sub === 'phrase' && <Phrasebook lang={lang} tzText={tzLabel(project?.timezone ?? '')} />}
       {sub === 'fx' && <FxCalc local={local} />}
+      {sub === 'pack' && project && <PackingList project={project} />}
     </div>
   );
 }
@@ -122,6 +126,95 @@ function Phrasebook({ lang, tzText }: { lang: string; tzText: string }) {
       ))}
       {list.length === 0 && <p className="py-8 text-center text-xs text-slate-600">검색 결과가 없어요</p>}
       {(loc || useApi) && <p className="text-center text-[10px] text-slate-600">문장을 누르면 현지어가 복사돼요 (점원·기사에게 보여주기)</p>}
+    </div>
+  );
+}
+
+function PackingList({ project }: { project: Project }) {
+  const packing = useAppStore((s) => s.present[s.activeProjectId]?.packing ?? []);
+  const mutate = useAppStore((s) => s.mutate);
+  const [add, setAdd] = useState('');
+
+  const seed = () => mutate((doc) => {
+    const have = new Set((doc.packing ?? []).map((p) => p.label));
+    doc.packing = [
+      ...(doc.packing ?? []),
+      ...packingPreset(project.destination, project.timezone, project.name)
+        .filter((it) => !have.has(it.label))
+        .map((it) => ({ id: uid(), label: it.label, cat: it.cat, done: false })),
+    ];
+  });
+  const toggle = (id: string) => mutate((doc) => {
+    const it = (doc.packing ?? []).find((p) => p.id === id); if (it) it.done = !it.done;
+  });
+  const remove = (id: string) => mutate((doc) => {
+    doc.packing = (doc.packing ?? []).filter((p) => p.id !== id);
+  });
+  const addItem = () => {
+    const label = add.trim(); if (!label) return;
+    mutate((doc) => { doc.packing = [...(doc.packing ?? []), { id: uid(), label, cat: '추가', done: false }]; });
+    setAdd('');
+  };
+
+  const groups = useMemo(() => {
+    const by: Record<string, typeof packing> = {};
+    for (const it of packing) (by[it.cat || '기타'] ??= []).push(it);
+    return Object.entries(by);
+  }, [packing]);
+  const done = packing.filter((p) => p.done).length;
+
+  if (packing.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-10 text-center">
+        <span className="text-4xl">🎒</span>
+        <p className="text-sm text-slate-400">{project.destination || '이 여행'} 맞춤 짐 목록을 만들어 드릴게요</p>
+        <button onClick={seed} className="btn-heart rounded-xl px-4 py-2 text-sm font-semibold">
+          여행지 추천 목록 불러오기
+        </button>
+        <p className="text-[11px] text-slate-600">불러온 뒤 자유롭게 체크·추가·삭제할 수 있어요</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between text-[11px] text-slate-400">
+        <span>{done} / {packing.length} 챙김</span>
+        <button onClick={seed} className="text-moose-heart">+ 추천 항목 추가</button>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full rounded-full bg-moose-heart transition-all" style={{ width: `${(done / packing.length) * 100}%` }} />
+      </div>
+
+      {groups.map(([cat, items]) => (
+        <div key={cat}>
+          <div className="mb-1 px-0.5 text-[11px] font-semibold text-slate-500">{cat}</div>
+          <div className="space-y-1">
+            {items.map((it) => (
+              <div key={it.id} className="flex items-center gap-2 rounded-lg bg-moose-dusk/70 px-3 py-2">
+                <button onClick={() => toggle(it.id)} className="flex flex-1 items-center gap-2 text-left">
+                  <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${it.done ? 'border-moose-heart bg-moose-heart text-white' : 'border-white/25'}`}>
+                    {it.done && '✓'}
+                  </span>
+                  <span className={`text-[13px] ${it.done ? 'text-slate-500 line-through' : 'text-slate-100'}`}>{it.label}</span>
+                </button>
+                <button onClick={() => remove(it.id)} className="shrink-0 text-slate-600 hover:text-rose-400"><X size={13} /></button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div className="flex gap-2">
+        <input
+          value={add}
+          onChange={(e) => setAdd(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addItem()}
+          placeholder="직접 추가 (예: 커플 잠옷)"
+          className="flex-1 rounded-lg bg-moose-edge px-3 py-2 text-sm text-slate-100 outline-none"
+        />
+        <button onClick={addItem} className="btn-heart shrink-0 rounded-lg px-3"><Plus size={15} /></button>
+      </div>
     </div>
   );
 }
