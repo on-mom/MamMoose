@@ -147,6 +147,11 @@ export function initCloudSync() {
 
     if (session?.user) {
       const m = session.user.user_metadata ?? {};
+      // 다른(또는 최초) 계정으로 로그인 → 이전 세션의 로컬 여행·프로필·테마를 비운다.
+      // 같은 계정 재접속(토큰 갱신·새로고침)이면 유지.
+      const prevUid = useAppStore.getState().cloudUser?.id ?? null;
+      if (session.user.id !== prevUid) useAppStore.getState().prepareForCloud();
+
       useAppStore.getState().setCloudUser({
         id: session.user.id,
         name: m.name || m.full_name || m.nickname || m.user_name || '여행자',

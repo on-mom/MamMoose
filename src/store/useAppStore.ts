@@ -15,11 +15,7 @@ const safeStorage = {
 import type {
   AppSettings, Project, TabKey, TimelineItem, TripDoc, UserProfile,
 } from '../types';
-import {
-  SEED_PROJECT, SEED_RESTAURANTS, SEED_HOTELS, SEED_SPOTS, SEED_TIMELINE,
-  SEED_TODOS, SEED_EXPENSES, SEED_DIARY, sampleProject, sampleDayIso, blankProject,
-  flightTimelineItem,
-} from '../data/seed';
+import { blankProject, flightTimelineItem } from '../data/seed';
 import { commit, undo as histUndo, redo as histRedo } from './history';
 
 const DEFAULT_PIN = '250914';
@@ -36,24 +32,8 @@ function emptyDoc(): TripDoc {
   return { timeline: [], restaurants: [], hotels: [], spots: [], todos: [], expenses: [], messages: [], people: {}, diary: [] };
 }
 
-/** 하노이 예시 데이터를 프로젝트에 귀속시켜 문서 생성 (전부 가상 값) */
-function hanoiDoc(projectId: string, startDate: string): TripDoc {
-  return {
-    ...emptyDoc(),
-    timeline: SEED_TIMELINE.map((t) => ({ ...t, id: uid(), projectId })),
-    restaurants: SEED_RESTAURANTS.map((r) => ({ ...r, id: uid(), projectId })),
-    hotels: SEED_HOTELS.map((h) => ({ ...h, id: uid(), projectId })),
-    spots: SEED_SPOTS.map((s) => ({ ...s, id: uid(), projectId })),
-    todos: SEED_TODOS.map((t) => ({ ...t, id: uid(), projectId })),
-    expenses: SEED_EXPENSES.map(({ dayOffset, ...e }) => ({
-      ...e, id: uid(), projectId, date: sampleDayIso(startDate, dayOffset),
-    })),
-    diary: SEED_DIARY.map(({ dayOffset, ...d }) => ({
-      ...d, id: uid(), projectId, date: sampleDayIso(startDate, dayOffset), createdAt: Date.now(),
-    })),
-  };
-}
 const START_PROJECT = blankProject();
+const EMPTY_PROFILE: UserProfile = { displayName: '', avatarDataUrl: null, chatBgDataUrl: null, statusMessage: '' };
 
 /** 여행 항공편 → 타임라인의 항공편 행 (1일차 / 마지막날). 항공편 없으면 빈 배열. */
 function flightRows(projectId: string, p: Pick<Project, 'startDate' | 'endDate' | 'outbound' | 'inbound'>): TimelineItem[] {
@@ -88,8 +68,8 @@ interface AppState {
   hydrateCloud: (projects: Project[], docs: Docs) => void;
   /** 로컬 빈 여행 상태로 초기화 (로그아웃) */
   resetLocal: () => void;
-  /** 하노이 예시 여행을 추가 (MY › 여행 "예시 불러오기") */
-  loadHanoiSample: () => string;
+  /** 클라우드 로그인 직후 — 이전 세션의 로컬 여행·프로필·테마를 비우고 클라우드만 반영 */
+  prepareForCloud: () => void;
 
   // --- 탭 네비게이션 ---
   activeTab: TabKey;
@@ -149,25 +129,30 @@ export const useAppStore = create<AppState>()(
           past: [],
           future: [],
         })),
-      resetLocal: () =>
-        set({
+      resetLocal: () => {
+        const fresh = blankProject();
+        set((s) => ({
           cloudUser: null,
-          projects: [START_PROJECT],
-          activeProjectId: START_PROJECT.id,
-          present: { [START_PROJECT.id]: emptyDoc() },
+          projects: [fresh],
+          activeProjectId: fresh.id,
+          present: { [fresh.id]: emptyDoc() },
+          profile: { ...EMPTY_PROFILE },
+          settings: { ...s.settings, themeAccent: undefined, themeBg: undefined, notifyMemories: false },
           past: [],
           future: [],
-        }),
-      loadHanoiSample: () => {
-        // 항상 새 로컬 id → 클라우드의 실제 여행과 절대 안 섞임, 늘 깨끗한 예시
-        const proj = { ...sampleProject(), id: `sample-${Date.now().toString(36)}` };
-        set((s) => ({
-          projects: [...s.projects, proj],
-          present: { ...s.present, [proj.id]: hanoiDoc(proj.id, proj.startDate) },
-          activeProjectId: proj.id,
-          past: [], future: [],
         }));
-        return proj.id;
+      },
+      prepareForCloud: () => {
+        const fresh = blankProject();
+        set((s) => ({
+          projects: [fresh],
+          activeProjectId: fresh.id,
+          present: { [fresh.id]: emptyDoc() },
+          profile: { ...EMPTY_PROFILE },
+          settings: { ...s.settings, themeAccent: undefined, themeBg: undefined, notifyMemories: false },
+          past: [],
+          future: [],
+        }));
       },
 
       activeTab: 'schedule',
@@ -237,7 +222,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'mammoose-store',
-      version: 9,
+      version: 10,
       storage: createJSONStorage(() => safeStorage),
       migrate: (persisted: any, from) => {
         if (from < 9) {
@@ -287,26 +272,20 @@ export const useAppStore = create<AppState>()(
             }
           }
         }
-        if (from < 4) {
-          // 시드 여행에 구조화된 항공편 주입 (자유 텍스트 → 구조화)
-          for (const p of persisted?.projects ?? []) {
-            if (p.id === SEED_PROJECT.id && !p.outbound) {
-              p.outbound = SEED_PROJECT.outbound;
-              p.inbound = SEED_PROJECT.inbound;
-            }
+        if (from < 10) {
+          // 예시(샘플) 여행 제거 — 로컬에 남아있던 sample-*/hanoi-2026-09 프로젝트 삭제
+          const isSample = (id: string) => id.startsWith('sample-') || id === 'hanoi-2026-09';
+          persisted.projects = (persisted?.projects ?? []).filter((p: any) => !isSample(p.id));
+          for (const k of Object.keys(persisted?.present ?? {})) {
+            if (isSample(k)) delete persisted.present[k];
           }
-        }
-        if (from < 3) {
-          // 최신 시드의 nameKo/menu 를 기존 맛집 데이터에 이름으로 병합 (수기 등록분은 보존)
-          const bySeed = new Map(SEED_RESTAURANTS.map((r) => [r.name, r]));
-          for (const doc of Object.values(persisted?.present ?? {}) as TripDoc[]) {
-            for (const r of doc?.restaurants ?? []) {
-              const seed = bySeed.get(r.name);
-              if (seed) {
-                if (!r.nameKo && seed.nameKo) r.nameKo = seed.nameKo;
-                if (!r.menu && seed.menu) r.menu = seed.menu;
-              }
-            }
+          if (!persisted.projects.length) {
+            const fresh = blankProject();
+            persisted.projects = [fresh];
+            persisted.present = { ...persisted.present, [fresh.id]: emptyDoc() };
+            persisted.activeProjectId = fresh.id;
+          } else if (isSample(persisted.activeProjectId ?? '')) {
+            persisted.activeProjectId = persisted.projects[0].id;
           }
         }
         return persisted;

@@ -384,7 +384,6 @@ function Trips() {
   const activeId = useAppStore((s) => s.activeProjectId);
   const setActive = useAppStore((s) => s.setActiveProject);
   const addProject = useAppStore((s) => s.addProject);
-  const loadHanoiSample = useAppStore((s) => s.loadHanoiSample);
   const patchProject = useAppStore((s) => s.patchProject);
   const removeProject = useAppStore((s) => s.removeProject);
   const cloudUser = useAppStore((s) => s.cloudUser);
@@ -524,20 +523,10 @@ function Trips() {
       {adding ? (
         <TripForm onSubmit={saveNew} onCancel={() => setAdding(false)} />
       ) : (
-        <div className="space-y-1.5">
-          <button onClick={() => setAdding(true)}
-            className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-white/10 py-3 text-xs text-slate-400">
-            <Plus size={14} /> 여행 프로젝트 추가
-          </button>
-          {!projects.some((p) => p.id.startsWith('sample-')) && (
-            <button
-              onClick={() => setActive(loadHanoiSample())}
-              className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-white/10 py-2.5 text-[11px] text-slate-500"
-            >
-              🫎 예시 여행 담기 · 하노이 3일 (가상 데이터 · 자유롭게 삭제)
-            </button>
-          )}
-        </div>
+        <button onClick={() => setAdding(true)}
+          className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-white/10 py-3 text-xs text-slate-400">
+          <Plus size={14} /> 여행 프로젝트 추가
+        </button>
       )}
       <p className="pt-1 text-center text-[10px] text-slate-600">여행을 선택하면 일정·맛집·Todo·가계부가 해당 여행 데이터로 전환됩니다</p>
 
