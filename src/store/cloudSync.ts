@@ -3,7 +3,7 @@
 // ponytail: 문서 전체 last-write-wins 동기화. 2인 여행엔 충분.
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { useAppStore } from './useAppStore';
+import { useAppStore, emptyDoc, flightRows } from './useAppStore';
 import { notifyNewComments } from '../lib/notify';
 import type { Project, TripDoc } from '../types';
 
@@ -222,6 +222,24 @@ export async function deleteMyAccount(): Promise<{ ok: boolean; error?: string }
   } catch { /* noop */ }
   useAppStore.getState().resetLocal();
   useAppStore.setState({ unlocked: false, cloudError: null });
+  return { ok: true };
+}
+
+/** 로그인 상태에서 새 여행 생성 — 로컬 임시 id 대신 클라우드에 바로 행을 만들고 활성화.
+ *  (로컬 trip-xxx id 는 pushWatcher 가 무시 → 동기화 안 되던 문제 방지) */
+export async function createCloudTrip(meta: Omit<Project, 'id'>): Promise<{ ok: boolean; error?: string }> {
+  if (!supabase) return { ok: false, error: '클라우드가 꺼져 있습니다' };
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return { ok: false, error: '로그인이 필요합니다' };
+  const doc = emptyDoc();
+  doc.timeline = flightRows('cloud', meta);
+  const { error } = await supabase.from('trips').insert({ owner: u.user.id, meta, doc });
+  if (error) return { ok: false, error: error.message };
+  bootstrapTried = true;
+  await fetchTrips();
+  // fetchTrips 는 created_at 오름차순 → 방금 만든 여행이 목록 마지막
+  const ps = useAppStore.getState().projects;
+  if (ps.length) useAppStore.getState().setActiveProject(ps[ps.length - 1].id);
   return { ok: true };
 }
 

@@ -28,7 +28,7 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const clone = <T,>(v: T): T =>
   typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v));
 
-function emptyDoc(): TripDoc {
+export function emptyDoc(): TripDoc {
   return { timeline: [], restaurants: [], hotels: [], spots: [], todos: [], expenses: [], messages: [], people: {}, diary: [] };
 }
 
@@ -36,7 +36,7 @@ const START_PROJECT = blankProject();
 const EMPTY_PROFILE: UserProfile = { displayName: '', avatarDataUrl: null, chatBgDataUrl: null, statusMessage: '' };
 
 /** 여행 항공편 → 타임라인의 항공편 행 (1일차 / 마지막날). 항공편 없으면 빈 배열. */
-function flightRows(projectId: string, p: Pick<Project, 'startDate' | 'endDate' | 'outbound' | 'inbound'>): TimelineItem[] {
+export function flightRows(projectId: string, p: Pick<Project, 'startDate' | 'endDate' | 'outbound' | 'inbound'>): TimelineItem[] {
   const days = Math.max(1, Math.round((Date.parse(p.endDate) - Date.parse(p.startDate)) / 86400000) + 1);
   const rows: TimelineItem[] = [];
   const has = (f?: { depAirport?: string; flightNo?: string }) => !!(f && (f.depAirport || f.flightNo));

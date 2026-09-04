@@ -7,7 +7,7 @@ import type { Project, Person } from '../types';
 import { useAppStore, useActiveProject, type CloudUser } from '../store/useAppStore';
 import { uid } from '../lib/uid';
 import { cloudEnabled, signOut } from '../lib/supabase';
-import { createInvite, acceptInvite, deleteCloudTrip, ejectMember, deleteMyAccount } from '../store/cloudSync';
+import { createInvite, acceptInvite, createCloudTrip, deleteCloudTrip, ejectMember, deleteMyAccount } from '../store/cloudSync';
 import { useMyName } from '../lib/members';
 import { Moose } from '../components/Moose';
 import CoupleMoose from '../components/CoupleMoose';
@@ -424,13 +424,20 @@ function Trips() {
       ? { ...fl, date: fl.date || fallbackDate, carrier: fl.carrier || carrierOf(fl.flightNo) || undefined }
       : undefined;
 
-  const saveNew = (d: TripFormData) => {
-    const id = addProject({
+  const [saveErr, setSaveErr] = useState('');
+  const saveNew = async (d: TripFormData) => {
+    const meta = {
       name: d.name.trim(), destination: d.destination.trim(),
       startDate: d.startDate, endDate: d.endDate, timezone: d.timezone,
       outbound: toFlight(d.outbound, d.startDate), inbound: toFlight(d.inbound, d.endDate),
-    });
-    setActive(id);
+    };
+    if (cloudUser) {
+      setSaveErr('');
+      const r = await createCloudTrip(meta);
+      if (!r.ok) { setSaveErr(r.error ?? '여행 생성 실패'); return; }
+    } else {
+      setActive(addProject(meta));
+    }
     setAdding(false);
   };
   const saveEdit = (id: string, d: TripFormData) => {
@@ -524,7 +531,10 @@ function Trips() {
       {joinMsg && <p className="text-center text-[11px] text-moose-heart">{joinMsg}</p>}
 
       {adding ? (
-        <TripForm onSubmit={saveNew} onCancel={() => setAdding(false)} />
+        <div>
+          <TripForm onSubmit={saveNew} onCancel={() => { setSaveErr(''); setAdding(false); }} />
+          {saveErr && <p className="mt-1 text-center text-[11px] text-rose-400">{saveErr}</p>}
+        </div>
       ) : (
         <button onClick={() => setAdding(true)}
           className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-white/10 py-3 text-xs text-slate-400">
