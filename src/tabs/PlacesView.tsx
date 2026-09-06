@@ -51,6 +51,7 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [editingDetail, setEditingDetail] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [mapSel, setMapSel] = useState<string | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null); // 행 클릭 → 이 장소 핀만
@@ -73,9 +74,8 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
   const focusOnMap = (p: Place) => {
     setFocusId(p.id);
     setMapSel(p.id);
-    setShowMap(true);
+    setShowMap(true); // 지도는 상단 고정이라 스크롤 이동 불필요
     geocodePlace(p);
-    requestAnimationFrame(() => mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
 
   const addOne = (p: Place, d = day) => {
@@ -126,6 +126,19 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
       if (row) row.poi = poi;
     });
 
+  // 등록한 장소(관광지·맛집·숙소) 내용 수정 — kind 별로 다른 원본 필드에 매핑
+  const patchPlace = (p: Place, patch: { name?: string; category?: string; area?: string; note?: string; menu?: string }) =>
+    mutate((doc) => {
+      const arr = doc[arrOf(p.kind)] as unknown as Array<Record<string, unknown> & { id: string }>;
+      const row = arr.find((x) => x.id === p.id);
+      if (!row) return;
+      if (patch.area != null) row.area = patch.area;
+      if (patch.category != null) row[p.kind === 'stay' ? 'grade' : 'category'] = patch.category;
+      if (patch.name != null) row[p.kind === 'food' ? 'nameKo' : 'name'] = patch.name;
+      if (patch.note != null) row[p.kind === 'landmark' ? 'tip' : p.kind === 'food' ? 'note' : 'feature'] = patch.note;
+      if (patch.menu != null && p.kind === 'food') row.menu = patch.menu;
+    });
+
   const pointFor = (p: Place): MapPoint => {
     const g = geo[p.id];
     if (g) return { id: p.id, lat: g.lat, lng: g.lng };
@@ -154,10 +167,9 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
     <div className={embedded ? 'edge flex min-h-0 flex-1 flex-col py-3' : 'edge space-y-2.5 py-3'}>
       {!embedded && searchBar}
       {embedded && <h2 className="mb-2 shrink-0 font-title text-xl font-bold text-white">탐색</h2>}
-      <div className={embedded ? '-mx-0.5 min-h-0 flex-1 space-y-2.5 overflow-y-auto px-0.5' : 'space-y-2.5'}>
 
-      {/* 액션 줄 */}
-      <div className="flex items-center justify-between text-xs">
+      {/* 액션 줄 — 상단 고정 */}
+      <div className="mb-2 flex shrink-0 items-center justify-between text-xs">
         <div className="no-scrollbar flex gap-1 overflow-x-auto">
           {Array.from({ length: days }, (_, i) => i + 1).map((d) => (
             <button
@@ -185,10 +197,9 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
         </div>
       </div>
 
-      {adding && <AddPlaceForm projectId={project.id} onDone={() => setAdding(false)} />}
-
+      {/* 지도 — ON 이면 상단 고정 (목록 스크롤과 무관) */}
       {showMap && (
-        <div ref={mapRef}>
+        <div ref={mapRef} className="mb-2 shrink-0">
           <div className="mb-1 flex items-center justify-between text-[11px]">
             <span className="truncate font-semibold text-moose-heart">
               {focusPlace ? `📍 ${focusPlace.name}` : '장소 미니맵'}
@@ -216,6 +227,11 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
           />
         </div>
       )}
+
+      {/* 스크롤 영역 (결과 목록) */}
+      <div className={embedded ? '-mx-0.5 min-h-0 flex-1 space-y-2.5 overflow-y-auto px-0.5' : 'space-y-2.5'}>
+
+      {adding && <AddPlaceForm projectId={project.id} onDone={() => setAdding(false)} />}
 
       {/* 결과 — 숙소만 필터한 경우 비교표, 그 외엔 카드 목록 */}
       {filter.kind === 'stay' && !selMode ? (
@@ -330,10 +346,21 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
       {/* 상세 모달 */}
       {detail && (
         <Modal
-          onClose={() => setDetailId(null)}
+          onClose={() => { setDetailId(null); setEditingDetail(false); }}
           title={
             <>
-              <div className="font-title text-base font-bold text-white">{detail.name}</div>
+              <div className="flex items-center gap-1.5">
+                <div className="font-title text-base font-bold text-white">{detail.name}</div>
+                {!isSeedPlace(detail.id) && (
+                  <button
+                    onClick={() => setEditingDetail((v) => !v)}
+                    className={`shrink-0 rounded p-1 ${editingDetail ? 'bg-moose-heart/20 text-moose-heart' : 'text-slate-500'}`}
+                    title="수정"
+                  >
+                    <PencilLine size={13} />
+                  </button>
+                )}
+              </div>
               <div className="mt-0.5 text-[12px] text-slate-400">
                 {[
                   KIND_LABEL[detail.kind].split('·')[0],
@@ -367,6 +394,10 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
           }
         >
           <div className="space-y-3">
+            {editingDetail && !isSeedPlace(detail.id) ? (
+              <PlaceEditForm place={detail} onSave={(patch) => { patchPlace(detail, patch); setEditingDetail(false); }} onCancel={() => setEditingDetail(false)} />
+            ) : (
+            <>
             {detailPhoto && (
               <div className="relative -mx-5 -mt-4 overflow-hidden">
                 <img
@@ -420,9 +451,56 @@ export default function PlacesView({ embedded }: { embedded?: boolean }) {
                 />
               </>
             )}
+            </>
+            )}
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+/* ---------- 등록 장소 내용 수정 폼 ---------- */
+function PlaceEditForm({
+  place, onSave, onCancel,
+}: {
+  place: Place;
+  onSave: (patch: { name: string; category: string; area: string; note: string; menu?: string }) => void;
+  onCancel: () => void;
+}) {
+  const [f, setF] = useState({
+    name: place.name, category: place.category === KIND_LABEL[place.kind].split('·')[0] ? '' : place.category,
+    area: place.area, note: place.note ?? '', menu: place.menu ?? '',
+  });
+  const inp = 'w-full rounded-lg bg-moose-edge px-3 py-2 text-sm text-slate-100 outline-none';
+  return (
+    <div className="space-y-2">
+      <label className="block text-[11px] text-slate-500">이름
+        <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={`mt-0.5 ${inp}`} />
+      </label>
+      <div className="flex gap-2">
+        <label className="flex-1 text-[11px] text-slate-500">종류
+          <input value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} placeholder="예: 라멘 / 전망대" className={`mt-0.5 ${inp}`} />
+        </label>
+        <label className="flex-1 text-[11px] text-slate-500">지역
+          <input value={f.area} onChange={(e) => setF({ ...f, area: e.target.value })} placeholder="예: 난바" className={`mt-0.5 ${inp}`} />
+        </label>
+      </div>
+      {place.kind === 'food' && (
+        <label className="block text-[11px] text-slate-500">추천 메뉴
+          <input value={f.menu} onChange={(e) => setF({ ...f, menu: e.target.value })} className={`mt-0.5 ${inp}`} />
+        </label>
+      )}
+      <label className="block text-[11px] text-slate-500">메모 · 팁
+        <textarea value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} rows={3} className={`mt-0.5 resize-none ${inp}`} />
+      </label>
+      <div className="flex gap-2 pt-1">
+        <button onClick={onCancel} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-300">취소</button>
+        <button
+          onClick={() => onSave({ name: f.name.trim() || place.name, category: f.category.trim(), area: f.area.trim(), note: f.note.trim(), menu: place.kind === 'food' ? f.menu.trim() : undefined })}
+          className="btn-heart flex-1 rounded-xl py-2 text-sm font-semibold"
+        >저장</button>
+      </div>
     </div>
   );
 }

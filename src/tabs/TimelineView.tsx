@@ -21,6 +21,7 @@ import { pushNotify } from '../lib/push';
 import { firstSentence } from '../lib/notify';
 import { useMemberNames, useMyName } from '../lib/members';
 import { usePlaces } from '../lib/places';
+import { usePlacePhoto } from '../lib/placePhoto';
 import { regionFor } from '../data/regions';
 import { useTripPresence } from '../lib/presence';
 import Modal from '../components/Modal';
@@ -527,14 +528,25 @@ function ReadCard({
   );
 }
 
-/* ---------- 항목 상세 (좋아요 · 코멘트) ---------- */
+/* ---------- 항목 상세 (장소 정보 · 좋아요 · 코멘트) ---------- */
+const isFlightRow = (it: TimelineItem) => !!it.flightLeg || /→/.test(it.place);
+
 function ItemDetailModal({ item, onClose }: { item: TimelineItem; onClose: () => void }) {
   const mutate = useAppStore((s) => s.mutate);
   const me = useMyName();
   const members = useMemberNames();
+  const places = usePlaces();
   const likes = item.likes ?? [];
   const iLike = likes.includes(me);
   const everyone = members.length > 0 && members.every((m) => likes.includes(m));
+
+  // 이 일정이 등록한 장소와 같은 이름이면 그 장소 상세(사진·메뉴·메모)를 함께 보여줌
+  const matched = useMemo(
+    () => (isFlightRow(item) ? undefined : places.find((p) => p.name === item.place || p.origName === item.place)),
+    [places, item.place],
+  );
+  const wikiPhoto = usePlacePhoto(isFlightRow(item) ? undefined : item.place, matched?.origName);
+  const photo = matched?.poi?.photo || wikiPhoto;
 
   const patchItem = (fn: (it: TimelineItem) => void) =>
     mutate((doc) => { const it = doc.timeline.find((x) => x.id === item.id); if (it) fn(it); });
@@ -559,7 +571,28 @@ function ItemDetailModal({ item, onClose }: { item: TimelineItem; onClose: () =>
       }
     >
       <div className="space-y-3">
+        {photo && (
+          <div className="relative -mx-5 -mt-4 overflow-hidden">
+            <img src={photo} alt={item.place} loading="lazy"
+              onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
+              className="h-40 w-full object-cover" />
+            {!matched?.poi?.photo && (
+              <span className="absolute bottom-1 right-1.5 rounded bg-black/45 px-1 py-0.5 text-[8px] text-white/70">위키피디아</span>
+            )}
+          </div>
+        )}
+        {matched?.category && (
+          <div className="text-[12px] text-slate-400">{matched.category}{matched.area ? ` · ${matched.area}` : ''}</div>
+        )}
+        {matched?.menu && (
+          <div className="rounded-xl bg-moose-heart/10 p-3 text-[13px] text-slate-100">
+            <span className="text-[11px] font-semibold text-moose-heart">추천 메뉴</span><br />{matched.menu}
+          </div>
+        )}
         {item.memo && <div className="rounded-lg bg-white/[0.04] p-2.5 text-[13px] text-slate-200">{item.memo}</div>}
+        {matched?.note && matched.note !== item.memo && (
+          <div className="text-[13px] leading-relaxed text-slate-300">{matched.note}</div>
+        )}
 
         <div className="flex items-center gap-2">
           <button

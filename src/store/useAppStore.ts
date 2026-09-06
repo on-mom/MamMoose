@@ -186,17 +186,30 @@ export const useAppStore = create<AppState>()(
       },
       patchProject: (id, patch) =>
         set((s) => {
+          const prev = s.projects.find((p) => p.id === id);
           const projects = s.projects.map((p) => (p.id === id ? { ...p, ...patch } : p));
-          const touchesFlights = ['outbound', 'inbound', 'startDate', 'endDate'].some((k) => k in patch);
           const doc = s.present[id];
           const proj = projects.find((p) => p.id === id);
-          if (!touchesFlights || !doc || !proj) return { projects };
-          // 항공편/기간이 바뀌면 타임라인 항공편 행 자동 갱신 (사용자 추가 행은 보존)
+          if (!doc || !proj || !prev) return { projects };
+          // 항공편 행 재생성은 '항공편 핵심정보/여행기간이 실제로 바뀌었을 때만'.
+          // (이름·통화 수정이나 carrier 자동채움만으론 재생성 안 함 → 타임라인에서 직접
+          //  편집한 항공편 행이 안 날아감)
+          const fk = (f?: Partial<import('../types').Flight>) =>
+            f ? [f.depAirport, f.arrAirport, f.depTime, f.arrTime, f.flightNo, f.date].join('|') : '';
+          const flightChanged =
+            fk(prev.outbound) !== fk(proj.outbound) || fk(prev.inbound) !== fk(proj.inbound)
+            || prev.startDate !== proj.startDate || prev.endDate !== proj.endDate;
+          if (!flightChanged) return { projects };
+          // 재생성하되 기존 항공편 행의 사용자 편집(메모·사진·좋아요·코멘트·완료)은 보존
+          const oldFlights = doc.timeline.filter((t) => t.flightLeg);
           const kept = doc.timeline.filter((t) => !t.flightLeg);
-          return {
-            projects,
-            present: { ...s.present, [id]: { ...doc, timeline: [...flightRows(id, proj), ...kept] } },
-          };
+          const fresh = flightRows(id, proj).map((f) => {
+            const old = oldFlights.find((o) => o.flightLeg === f.flightLeg);
+            return old
+              ? { ...f, id: old.id, memo: old.memo || f.memo, photos: old.photos, likes: old.likes, comments: old.comments, done: old.done }
+              : f;
+          });
+          return { projects, present: { ...s.present, [id]: { ...doc, timeline: [...fresh, ...kept] } } };
         }),
       removeProject: (id) =>
         set((s) => {

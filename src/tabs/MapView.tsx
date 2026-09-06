@@ -121,7 +121,9 @@ export default function MapView() {
   };
 
   return (
-    <div className="edge flex h-full flex-col space-y-3 overflow-y-auto py-3">
+    <div className="edge flex h-full flex-col py-3">
+      {/* 상단 고정: 날짜 · 지도 · 동선 정렬 */}
+      <div className="shrink-0 space-y-3">
       <div className="flex items-center gap-2">
         <div className="no-scrollbar flex flex-1 gap-1.5 overflow-x-auto pb-1">
           {Array.from({ length: days }, (_, i) => i + 1).map((d) => (
@@ -177,8 +179,10 @@ export default function MapView() {
             : <span className="w-full text-[10px] text-slate-500">장소에 핀을 찍으면 거리순으로 정렬할 수 있어요</span>}
         </div>
       )}
+      </div>
 
-      <ul className="space-y-1.5">
+      {/* 스크롤 영역: 일정 목록 */}
+      <ul className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto">
         {dayItems.length === 0 && (
           <li className="py-4 text-center text-xs text-slate-600">이 날짜의 일정이 없습니다</li>
         )}
@@ -231,12 +235,12 @@ export default function MapView() {
             )}
           </li>
         ))}
+        <li className="pt-1 text-center text-[10px] text-slate-600">
+          {KEY
+            ? '행을 누르면 지도가 그 위치로 이동 · 마커를 끌어 미세 조정하면 타임라인과 동기화'
+            : '행을 누르면 핀 강조 · 마커를 끌어 위치 조정 (Google Maps 키 미설정 — Mock 지도)'}
+        </li>
       </ul>
-      <p className="text-center text-[10px] text-slate-600">
-        {KEY
-          ? '행을 누르면 지도가 그 위치로 이동 · 마커를 끌어 미세 조정하면 타임라인과 동기화'
-          : '행을 누르면 핀 강조 · 마커를 끌어 위치 조정 (Google Maps 키 미설정 — Mock 지도)'}
-      </p>
     </div>
   );
 }
