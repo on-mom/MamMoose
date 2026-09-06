@@ -50,6 +50,7 @@ const VIET_DISTRICT: [RegExp, string][] = [
   [/Hai Bà Trưng/i, '하이바쯩'],
 ];
 export const hotelArea = (h: Hotel): string => {
+  if (h.area?.trim()) return h.area.trim();
   for (const [re, ko] of VIET_DISTRICT) if (re.test(h.address)) return ko;
   return h.nearby.match(/서호|올드쿼터|바딘|꺼우저이|미딘|하이바쯩|호안끼엠/)?.[0] ?? '';
 };

@@ -553,6 +553,7 @@ function PoiSection({ place, onSave }: { place: Place; onSave: (poi: PoiInfo) =>
 /* ---------- 장소 직접 추가 (맛집으로 등록) ---------- */
 function AddPlaceForm({ projectId, onDone }: { projectId: string; onDone: () => void }) {
   const mutate = useAppStore((s) => s.mutate);
+  const [kind, setKind] = useState<PlaceKind>('food');
   const [f, setF] = useState({ nameKo: '', name: '', category: '', area: '', mapUrl: '', priceVndText: '', menu: '', note: '' });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const areas = Object.keys(AREA_COORDS);
@@ -573,39 +574,73 @@ function AddPlaceForm({ projectId, onDone }: { projectId: string; onDone: () => 
   const submit = () => {
     const display = f.nameKo.trim() || f.name.trim();
     if (!display) return;
+    const id = uid();
+    const area = f.area.trim();
+    const mapUrl = f.mapUrl.trim() || poi?.mapUrl
+      || `https://maps.google.com/?q=${encodeURIComponent(f.name || display)}`;
     mutate((doc) => {
-      doc.restaurants.unshift({
-        id: uid(), projectId,
-        name: f.name.trim() || display,
-        nameKo: f.nameKo.trim() || undefined,
-        category: f.category.trim() || '기타',
-        area: f.area.trim(),
-        mapUrl: f.mapUrl.trim() || poi?.mapUrl || `https://maps.google.com/?q=${encodeURIComponent((f.name || display) + ' Hanoi')}`,
-        priceVndText: f.priceVndText.trim(), priceKrwText: '',
-        priceVndAvg: Number((f.priceVndText.match(/[\d,]+/)?.[0] ?? '').replace(/,/g, '')) || 0,
-        menu: f.menu.trim() || undefined,
-        note: f.note.trim(), custom: true,
-        poi,
-      });
+      if (kind === 'stay') {
+        doc.hotels.unshift({
+          id, projectId, name: display, grade: f.category.trim(), rating: poi?.rating ?? 0,
+          address: poi?.address ?? '', priceTotalText: f.priceVndText.trim(),
+          nearby: '', area, feature: f.note.trim(), breakfast: '', comments: [], poi,
+        });
+      } else if (kind === 'landmark') {
+        doc.spots.unshift({
+          id, projectId, name: display, category: f.category.trim() || '관광지',
+          area, tip: f.note.trim(), nearby: '', comments: [], poi,
+        });
+      } else {
+        doc.restaurants.unshift({
+          id, projectId,
+          name: f.name.trim() || display,
+          nameKo: f.nameKo.trim() || undefined,
+          category: f.category.trim() || '기타',
+          area,
+          mapUrl,
+          priceVndText: f.priceVndText.trim(), priceKrwText: '',
+          priceVndAvg: Number((f.priceVndText.match(/[\d,]+/)?.[0] ?? '').replace(/,/g, '')) || 0,
+          menu: f.menu.trim() || undefined,
+          note: f.note.trim(), custom: true,
+          poi,
+        });
+      }
     });
     onDone();
   };
+  const KINDS: [PlaceKind, string][] = [['landmark', '관광지'], ['food', '맛집·카페'], ['stay', '숙소']];
 
   const inp = 'w-full rounded-lg bg-white/5 px-2.5 py-2 text-slate-100 outline-none ring-1 ring-white/5';
   return (
     <div className="card space-y-2 p-3 text-xs">
+      <div className="flex gap-1.5">
+        {KINDS.map(([k, l]) => (
+          <button
+            key={k}
+            onClick={() => setKind(k)}
+            className={`flex-1 rounded-lg py-1.5 text-[11px] font-medium ${kind === k ? 'btn-heart' : 'bg-white/5 text-slate-400'}`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
       <input value={f.nameKo} onChange={set('nameKo')} placeholder="장소 이름 (한국어 표기 · 필수)" className={inp} />
       <input value={f.name} onChange={set('name')} placeholder="현지어·영문 표기 (지도 검색용)" className={inp} />
       <input value={f.mapUrl} onChange={set('mapUrl')} placeholder="구글 지도 링크 붙여넣기 (선택)" className={inp} />
       <PoiFetchButton busy={busy} error={error} onClick={fetchPoi} />
       {poi && <PoiPanel poi={poi} />}
       <div className="grid grid-cols-2 gap-2">
-        <input value={f.category} onChange={set('category')} placeholder="종류 (맛집·카페·관광 등)" className={inp} />
+        <input value={f.category} onChange={set('category')}
+          placeholder={kind === 'stay' ? '등급 (호텔·게스트하우스 등)' : kind === 'landmark' ? '종류 (전망대·사원 등)' : '종류 (맛집·카페 등)'}
+          className={inp} />
         <input value={f.area} onChange={set('area')} list="area-list" placeholder="지역·구역" className={inp} />
         <datalist id="area-list">{areas.map((a) => <option key={a} value={a} />)}</datalist>
       </div>
-      <input value={f.priceVndText} onChange={set('priceVndText')} placeholder="예상 가격 (예: 1인 2만원, 180k VND)" className={inp} />
-      <input value={f.menu} onChange={set('menu')} placeholder="추천 메뉴 · 볼거리" className={inp} />
+      <input value={f.priceVndText} onChange={set('priceVndText')}
+        placeholder={kind === 'stay' ? '숙박 총액 (예: 2박 32만원)' : '예상 가격 (예: 1인 2만원)'} className={inp} />
+      {kind === 'food' && (
+        <input value={f.menu} onChange={set('menu')} placeholder="추천 메뉴" className={inp} />
+      )}
       <input value={f.note} onChange={set('note')} placeholder="한 줄 소개 · 메모" className={inp} />
       <div className="flex justify-end gap-2 pt-1">
         <button onClick={onDone} className="px-3 py-1 text-slate-400">취소</button>

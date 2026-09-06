@@ -138,6 +138,8 @@ export interface Hotel {
   nearby: string;
   feature: string;
   breakfast: string;
+  /** 직접 등록 시 사용자가 입력한 구역 (없으면 address/nearby 로 추정) */
+  area?: string;
   /** 상세 모달 댓글 */
   comments?: EntryComment[];
   poi?: PoiInfo;
